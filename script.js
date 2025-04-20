@@ -9,6 +9,7 @@ let canvasHeight = 600;
 let imagesLoaded = 0;
 const totalImages = 1; // egg only
 let allImagesLoaded = false;
+let level = 1; // Start at level 1
 
 const eggImage = new Image();
 eggImage.onload = imageLoaded;
@@ -157,6 +158,12 @@ function drawScore() {
     ctx.fillText('Score: ' + score, 15, 25);
 }
 
+function drawLevel() {
+    ctx.font = '20px "Comic Sans MS", cursive, sans-serif';
+    ctx.fillStyle = '#5a3a22';
+    ctx.fillText('Level: ' + level, canvas.width / 2 - 40, 25);
+}
+
 function drawLives() {
     ctx.font = '20px "Comic Sans MS", cursive, sans-serif';
     ctx.fillStyle = '#5a3a22';
@@ -181,8 +188,23 @@ function collisionDetection() {
                 animateBrickBreak(b);
                 if (Math.random() < 0.2) createPowerUp(b.x, b.y);
                 if (score === brick.rowCount * brick.columnCount) {
-                    gameWon = true;
-                    return;
+                    level++; // Increase level
+                    ball.speed *= 1.1; // Speed up ball by 10%
+
+                    // Recalculate dx/dy using new speed but maintain direction
+                    const directionX = ball.dx >= 0 ? 1 : -1;
+                    const directionY = ball.dy >= 0 ? 1 : -1;
+                    ball.dx = directionX * Math.min(Math.abs(ball.dx) * 1.1, ball.speed);
+                    ball.dy = directionY * Math.min(Math.abs(ball.dy) * 1.1, ball.speed);
+
+                    // Reset score and bricks for new level
+                    score = 0;
+                    createBricks();
+                    positionBricks();
+
+                    // Optional: pause briefly before next level
+                    gamePaused = true;
+                    setTimeout(() => gamePaused = false, 1000);
                 }
             }
         }
@@ -199,7 +221,7 @@ function collisionDetection() {
         const collidePoint = ball.x - (paddle.x + paddle.width / 2);
         ball.dx = collidePoint * 0.1;
         ball.dx = Math.max(-ball.speed * 0.9,
-                          Math.min(ball.speed * 0.9, ball.dx));
+            Math.min(ball.speed * 0.9, ball.dx));
         ball.y = paddle.y - ball.radius;
         return;
     }
@@ -269,7 +291,7 @@ function animateBrickBreak(brickObj) {
             duration: 0.3,
             scale: 1.5,
             opacity: 0,
-            onComplete: () => {}
+            onComplete: () => { }
         });
         drawSparkles(brickObj.x + brick.width / 2, brickObj.y + brick.height / 2);
     }
@@ -296,7 +318,7 @@ function drawSparkles(x, y) {
                 alive = true;
                 p.x += p.speedX;
                 p.y += p.speedY;
-                p.life -= 1/60;
+                p.life -= 1 / 60;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
                 ctx.fillStyle = p.color;
@@ -313,12 +335,40 @@ function drawSparkles(x, y) {
 // --- Game Loop ---
 function draw() {
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    // 1. Draw semi-transparent overlay over the playable area
+    // Feathered black overlay on play area
+    const featherSize = 60; // in pixels, tweak for softness
+
+    // Middle opaque black rectangle
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(playAreaXMin + featherSize, 0, (playAreaXMax - playAreaXMin) - featherSize * 2, canvasHeight);
+
+    // Left gradient
+    let gradLeft = ctx.createLinearGradient(playAreaXMin, 0, playAreaXMin + featherSize, 0);
+    gradLeft.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    gradLeft.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+    ctx.fillStyle = gradLeft;
+    ctx.fillRect(playAreaXMin, 0, featherSize, canvasHeight);
+
+    // Right gradient
+    let gradRight = ctx.createLinearGradient(playAreaXMax - featherSize, 0, playAreaXMax, 0);
+    gradRight.addColorStop(0, 'rgba(0, 0, 0, 0.5)');
+    gradRight.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = gradRight;
+    ctx.fillRect(playAreaXMax - featherSize, 0, featherSize, canvasHeight);
+
+
+    // 2. Draw game elements *on top* of the overlay
     drawBricks();
+    drawPowerUps();
     drawBall();
     drawPaddle();
-    drawPowerUps();
     drawScore();
     drawLives();
+    drawLevel();
+
+    // 3. Draw messages if game is over, won, or paused
     if (gameOver) {
         drawMessage("GAME OVER\nClick to Play Again");
         return;
@@ -354,20 +404,20 @@ function gameLoop() {
 // --- Event Listeners ---
 function keyDownHandler(e) {
     if (e.key === 'Right' || e.key === 'ArrowRight') rightPressed = true;
-    if (e.key === 'Left'  || e.key === 'ArrowLeft')  leftPressed = true;
+    if (e.key === 'Left' || e.key === 'ArrowLeft') leftPressed = true;
     if (e.key === 'p' || e.key === 'P') gamePaused = !gamePaused;
 }
 
 function keyUpHandler(e) {
     if (e.key === 'Right' || e.key === 'ArrowRight') rightPressed = false;
-    if (e.key === 'Left'  || e.key === 'ArrowLeft')  leftPressed = false;
+    if (e.key === 'Left' || e.key === 'ArrowLeft') leftPressed = false;
 }
 
 function mouseMoveHandler(e) {
     const relativeX = Math.max(playAreaXMin, Math.min(e.clientX, playAreaXMax));
     paddle.x = Math.max(playAreaXMin,
-                        Math.min(relativeX - paddle.width / 2,
-                                 playAreaXMax - paddle.width));
+        Math.min(relativeX - paddle.width / 2,
+            playAreaXMax - paddle.width));
 }
 
 function touchMoveHandler(e) {
@@ -375,8 +425,8 @@ function touchMoveHandler(e) {
         const touch = e.touches[0];
         const relativeX = Math.max(playAreaXMin, Math.min(touch.clientX, playAreaXMax));
         paddle.x = Math.max(playAreaXMin,
-                            Math.min(relativeX - paddle.width / 2,
-                                     playAreaXMax - paddle.width));
+            Math.min(relativeX - paddle.width / 2,
+                playAreaXMax - paddle.width));
     }
     e.preventDefault();
 }
@@ -390,7 +440,7 @@ document.addEventListener('touchstart', handleRestart);
 
 // --- Helper Functions ---
 function getRandomPastelColor() {
-    const pastel = ['#FFB6C1','#FFDAB9','#E6E6FA','#B0E0E6','#98FB98','#FFFACD','#ADD8E6'];
+    const pastel = ['#FFB6C1', '#FFDAB9', '#E6E6FA', '#B0E0E6', '#98FB98', '#FFFACD', '#ADD8E6'];
     return pastel[Math.floor(Math.random() * pastel.length)];
 }
 
@@ -398,7 +448,7 @@ function drawMessage(message) {
     ctx.font = '48px "Comic Sans MS", cursive, sans-serif';
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
     ctx.textAlign = 'center';
-    ctx.fillText(message, canvasWidth/2, canvasHeight/2);
+    ctx.fillText(message, canvasWidth / 2, canvasHeight / 2);
     ctx.textAlign = 'left';
 }
 
