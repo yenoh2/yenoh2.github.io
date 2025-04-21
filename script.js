@@ -9,7 +9,11 @@ let canvasHeight = 600;
 let imagesLoaded = 0;
 const totalImages = 1; // egg only
 let allImagesLoaded = false;
+
+// --- Game Variables ---
 let level = 1; // Start at level 1
+let activeParticles = []; // Holds sparkles
+
 
 const eggImage = new Image();
 eggImage.onload = imageLoaded;
@@ -185,7 +189,7 @@ function collisionDetection() {
                 ball.dy = -ball.dy;
                 b.status = 0;
                 score++;
-                animateBrickBreak(b);
+                animateBrickBreak(b.x + brick.width / 2, b.y + brick.height / 2);
                 if (Math.random() < 0.2) createPowerUp(b.x, b.y);
                 if (score === brick.rowCount * brick.columnCount) {
                     level++; // Increase level
@@ -285,17 +289,39 @@ function updatePowerUps() {
 }
 
 // --- Animations ---
-function animateBrickBreak(brickObj) {
-    if (brickObj.element && gsap) {
-        gsap.to(brickObj.element, {
-            duration: 0.3,
-            scale: 1.5,
-            opacity: 0,
-            onComplete: () => { }
+function animateBrickBreak(x, y) {
+    const particleCount = 12;
+    for (let i = 0; i < particleCount; i++) {
+        activeParticles.push({
+            x: x,
+            y: y,
+            size: Math.random() * 3 + 1,
+            speedX: (Math.random() - 0.5) * 4,
+            speedY: (Math.random() - 0.5) * 4,
+            color: ['#FFD700', '#FFFFFF', '#FFB6C1'][Math.floor(Math.random() * 3)],
+            life: 1.0
         });
-        drawSparkles(brickObj.x + brick.width / 2, brickObj.y + brick.height / 2);
     }
 }
+
+
+function updateParticles() {
+    activeParticles = activeParticles.filter(p => p.life > 0);
+    activeParticles.forEach(p => {
+        p.x += p.speedX;
+        p.y += p.speedY;
+        p.life -= 1 / 60;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fill();
+        ctx.closePath();
+    });
+    ctx.globalAlpha = 1.0;
+}
+
 
 function drawSparkles(x, y) {
     const particleCount = 10;
@@ -361,6 +387,7 @@ function draw() {
 
     // 2. Draw game elements *on top* of the overlay
     drawBricks();
+    updateParticles(); // Show active sparkles
     drawPowerUps();
     drawBall();
     drawPaddle();
