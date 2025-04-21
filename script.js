@@ -10,11 +10,6 @@ let imagesLoaded = 0;
 const totalImages = 1; // egg only
 let allImagesLoaded = false;
 
-// --- Game Variables ---
-let level = 1; // Start at level 1
-let activeParticles = []; // Holds sparkles
-
-
 const eggImage = new Image();
 eggImage.onload = imageLoaded;
 eggImage.src = 'assets/egg.png';
@@ -38,7 +33,10 @@ const sounds = {
 // --- Game Variables ---
 let score = 0;
 let lives = 3;
+let level = 1; // Start at level 1
+let activeParticles = []; // Holds sparkles
 let gamePaused = false;
+let pauseMessage = "Get Ready...";
 let gameOver = false;
 let gameWon = false;
 let rightPressed = false;
@@ -58,6 +56,9 @@ const ball = {
     dy: -4,
     color: getRandomPastelColor()
 };
+let ballTrail = []; // stores recent positions
+const maxTrailLength = 10; // number of dots in trail
+
 
 // --- Paddle (Bunny) ---
 const paddle = {
@@ -89,20 +90,29 @@ let bricks = [];
 // --- Power-ups ---
 let powerUps = [];
 const powerUpTypes = {
-    WIDE_PADDLE: 'wide_paddle'
+    WIDE_PADDLE: 'wide_paddle',
+    SPEED_UP: 'speed_up'
 };
 
+
 function createPowerUp(x, y) {
+    const types = [
+        { type: powerUpTypes.WIDE_PADDLE, color: '#FFD700' }, // Gold
+        { type: powerUpTypes.SPEED_UP, color: '#FF6347' } // Tomato Red
+    ];
+    const selected = types[Math.floor(Math.random() * types.length)];
+
     powerUps.push({
         x: x + brick.width / 2 - 5,
         y: y,
         width: 10,
         height: 10,
         dy: 2,
-        type: powerUpTypes.WIDE_PADDLE,
-        color: '#FFD700'
+        type: selected.type,
+        color: selected.color
     });
 }
+
 
 // --- Drawing Functions ---
 function drawBall() {
@@ -112,6 +122,22 @@ function drawBall() {
     ctx.fill();
     ctx.closePath();
 }
+
+function drawBallTrail() {
+    const rgb = hexToRGB(ball.color); // get RGB components
+
+    for (let i = 0; i < ballTrail.length; i++) {
+        const pos = ballTrail[i];
+        const alpha = i / ballTrail.length;
+
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, ball.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+        ctx.fill();
+        ctx.closePath();
+    }
+}
+
 
 function drawPaddle() {
     ctx.beginPath();
@@ -173,6 +199,35 @@ function drawLives() {
     ctx.fillStyle = '#5a3a22';
     ctx.fillText('Lives: ' + lives, canvas.width - 85, 25);
 }
+
+function drawSpeedBar() {
+    const barX = 15;
+    const barY = 40;
+    const barWidth = 150;
+    const barHeight = 10;
+    const baseSpeed = 4;
+    const maxSpeed = 8;
+
+    // Draw background
+    ctx.fillStyle = '#ddd';
+    ctx.fillRect(barX, barY, barWidth, barHeight);
+
+    // Draw current speed
+    const fillRatio = (ball.speed - baseSpeed) / (maxSpeed - baseSpeed);
+    const fillWidth = Math.max(0, Math.min(1, fillRatio)) * barWidth;
+    ctx.fillStyle = '#FF6347'; // tomato red for speed-up
+    ctx.fillRect(barX, barY, fillWidth, barHeight);
+
+    // Draw border
+    ctx.strokeStyle = '#5a3a22';
+    ctx.strokeRect(barX, barY, barWidth, barHeight);
+
+    // Draw label
+    ctx.font = '14px "Comic Sans MS", cursive, sans-serif';
+    ctx.fillStyle = '#5a3a22';
+    ctx.fillText('Speed', barX, barY - 5);
+}
+
 
 // --- Collision Detection (updated) ---
 function collisionDetection() {
@@ -281,6 +336,14 @@ function activatePowerUp(type) {
             paddle.width = paddle.originalWidth;
             paddle.powerUpActive = false;
         }, 10000);
+    } else if (type === powerUpTypes.SPEED_UP) {
+        const newSpeed = Math.min(ball.speed * 1.2, 8); // cap at 8
+        ball.speed = newSpeed;
+
+        const directionX = ball.dx >= 0 ? 1 : -1;
+        const directionY = ball.dy >= 0 ? 1 : -1;
+        ball.dx = directionX * newSpeed;
+        ball.dy = directionY * newSpeed;
     }
 }
 
@@ -320,6 +383,17 @@ function updateParticles() {
         ctx.closePath();
     });
     ctx.globalAlpha = 1.0;
+}
+
+function drawPauseOverlay(message) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    ctx.font = '48px "Comic Sans MS", cursive, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(message, canvasWidth / 2, canvasHeight / 2);
+    ctx.textAlign = 'left'; // Reset alignment
 }
 
 
@@ -389,11 +463,14 @@ function draw() {
     drawBricks();
     updateParticles(); // Show active sparkles
     drawPowerUps();
+    drawBallTrail();
     drawBall();
     drawPaddle();
     drawScore();
     drawLives();
     drawLevel();
+    drawSpeedBar();
+
 
     // 3. Draw messages if game is over, won, or paused
     if (gameOver) {
@@ -405,8 +482,22 @@ function draw() {
         return;
     }
     if (gamePaused && !gameOver && !gameWon) {
-        drawMessage("Get Ready...");
+        drawPauseOverlay(pauseMessage);
+        return;
     }
+}
+
+function hexToRGB(hex) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) {
+        hex = hex.split('').map(char => char + char).join('');
+    }
+    const bigint = parseInt(hex, 16);
+    return {
+        r: (bigint >> 16) & 255,
+        g: (bigint >> 8) & 255,
+        b: bigint & 255
+    };
 }
 
 function update() {
@@ -418,7 +509,35 @@ function update() {
     }
     ball.x += ball.dx;
     ball.y += ball.dy;
+    // Only record trail when at max speed
+    if (ball.speed >= 8) {
+        ballTrail.push({ x: ball.x, y: ball.y });
+        if (ballTrail.length > maxTrailLength) {
+            ballTrail.shift(); // keep it short
+        }
+    } else {
+        ballTrail = []; // reset trail when not fast
+    }
+
     updatePowerUps();
+    // Check if paddle collects any power-ups
+    powerUps = powerUps.filter(pu => {
+        const hitsPaddle = (
+            pu.x < paddle.x + paddle.width &&
+            pu.x + pu.width > paddle.x &&
+            pu.y < paddle.y + paddle.height &&
+            pu.y + pu.height > paddle.y
+        );
+
+        if (hitsPaddle) {
+            activatePowerUp(pu.type);
+            sounds.powerup.play(); // Optional: play power-up sound
+            return false; // remove from array
+        }
+
+        // Remove if it falls below screen
+        return pu.y < canvasHeight;
+    });
     collisionDetection();
 }
 
@@ -433,6 +552,7 @@ function keyDownHandler(e) {
     if (e.key === 'Right' || e.key === 'ArrowRight') rightPressed = true;
     if (e.key === 'Left' || e.key === 'ArrowLeft') leftPressed = true;
     if (e.key === 'p' || e.key === 'P') gamePaused = !gamePaused;
+    pauseMessage = gamePaused ? "Paused" : "Get Ready...";
 }
 
 function keyUpHandler(e) {
@@ -577,8 +697,14 @@ function resetGame() {
 }
 
 function handleRestart() {
-    if (gameOver || gameWon) resetGame();
+    if (gameOver || gameWon) {
+        resetGame();
+    } else {
+        gamePaused = !gamePaused;
+        pauseMessage = gamePaused ? "Paused" : "Get Ready...";
+    }
 }
+
 
 function startGame() {
     if (!allImagesLoaded) return;
