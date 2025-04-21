@@ -338,22 +338,22 @@ function draw() {
 
     // 1. Draw semi-transparent overlay over the playable area
     // Feathered black overlay on play area
-    const featherSize = 60; // in pixels, tweak for softness
+    const featherSize = 20; // in pixels, tweak for softness
 
     // Middle opaque black rectangle
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.fillRect(playAreaXMin + featherSize, 0, (playAreaXMax - playAreaXMin) - featherSize * 2, canvasHeight);
 
     // Left gradient
     let gradLeft = ctx.createLinearGradient(playAreaXMin, 0, playAreaXMin + featherSize, 0);
     gradLeft.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    gradLeft.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+    gradLeft.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
     ctx.fillStyle = gradLeft;
     ctx.fillRect(playAreaXMin, 0, featherSize, canvasHeight);
 
     // Right gradient
     let gradRight = ctx.createLinearGradient(playAreaXMax - featherSize, 0, playAreaXMax, 0);
-    gradRight.addColorStop(0, 'rgba(0, 0, 0, 0.5)');
+    gradRight.addColorStop(0, 'rgba(0, 0, 0, 0.3)');
     gradRight.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = gradRight;
     ctx.fillRect(playAreaXMax - featherSize, 0, featherSize, canvasHeight);
