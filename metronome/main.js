@@ -41,6 +41,12 @@ const row1El = document.getElementById('quickPickRow1');
 const row2El = document.getElementById('quickPickRow2');
 const editRow1Btn = document.getElementById('editRow1');
 const editRow2Btn = document.getElementById('editRow2');
+const numberPadOverlay = document.getElementById('numberPadOverlay');
+const numpadDisplay = document.getElementById('numpadDisplay');
+
+// Number Pad State
+let numpadValue = '';
+let numpadCallback = null;
 
 // --- Initialization ---
 
@@ -366,20 +372,20 @@ function renderQuickPicks() {
     updateQuickPickActive();
 }
 
+
 function handleQuickPickClick(rowKey, index, val) {
     if (isEditing[rowKey]) {
-        // Edit Mode: Prompt to change value
-        const newVal = prompt(`Enter new BPM for ${rowKey === 'row1' ? 'Blue' : 'Pink'} Row:`, val);
-        if (newVal !== null) {
-            const parsed = parseInt(newVal);
-            if (!isNaN(parsed) && parsed >= MIN_BPM && parsed <= MAX_BPM) {
-                quickPicks[rowKey][index] = parsed;
-                renderQuickPicks();
-                saveSettings();
-            } else {
-                alert(`Please enter a number between ${MIN_BPM} and ${MAX_BPM}`);
+        // Edit Mode: Show number pad
+        showNumberPad(val, (newVal) => {
+            if (newVal !== null) {
+                const parsed = parseInt(newVal);
+                if (!isNaN(parsed) && parsed >= MIN_BPM && parsed <= MAX_BPM) {
+                    quickPicks[rowKey][index] = parsed;
+                    renderQuickPicks();
+                    saveSettings();
+                }
             }
-        }
+        });
     } else {
         // Normal Mode: Set BPM
         bpm = val;
@@ -462,6 +468,59 @@ function saveSettings() {
     localStorage.setItem('metronome_accent', isAccentEnabled);
     localStorage.setItem('metronome_quickPicks', JSON.stringify(quickPicks));
 }
+
+// --- Number Pad Functions ---
+
+function showNumberPad(currentValue, callback) {
+    numpadValue = String(currentValue);
+    numpadCallback = callback;
+    numpadDisplay.textContent = numpadValue;
+    numberPadOverlay.style.display = 'flex';
+}
+
+function hideNumberPad() {
+    numberPadOverlay.style.display = 'none';
+    numpadValue = '';
+    numpadCallback = null;
+}
+
+function handleNumpadInput(input) {
+    if (input === 'backspace') {
+        numpadValue = numpadValue.slice(0, -1);
+        if (numpadValue === '') numpadValue = '0';
+    } else if (input === 'submit') {
+        if (numpadCallback) {
+            numpadCallback(numpadValue);
+        }
+        hideNumberPad();
+    } else {
+        // Number input
+        if (numpadValue === '0') {
+            numpadValue = input;
+        } else {
+            numpadValue += input;
+        }
+        // Cap at 3 digits (max BPM is 230)
+        if (numpadValue.length > 3) {
+            numpadValue = numpadValue.slice(0, 3);
+        }
+    }
+    numpadDisplay.textContent = numpadValue;
+}
+
+// Setup Number Pad Event Listeners
+document.querySelectorAll('.numpad-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const num = btn.dataset.num;
+        const action = btn.dataset.action;
+
+        if (num) {
+            handleNumpadInput(num);
+        } else if (action) {
+            handleNumpadInput(action);
+        }
+    });
+});
 
 // Start
 init();

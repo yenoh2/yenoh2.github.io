@@ -15,20 +15,24 @@
 
 <body>
     <div id="app">
-        <!-- Beat Indicators -->
-        <div class="beat-indicators" id="beatIndicators">
-            <!-- Dynamically populated -->
-        </div>
-
-        <!-- BPM Display -->
-        <div class="bpm-display">
-            <div class="tempo-marking" id="tempoMarking">Moderato</div>
-            <div class="bpm-control-wrapper">
-                <button id="bpmMinus" class="fine-tune-btn">-</button>
+        <!-- Header: BPM + Time Sig -->
+        <div class="header-controls">
+            <!-- BPM Display -->
+            <div class="bpm-display">
+                <div class="tempo-marking" id="tempoMarking">Moderato</div>
                 <div class="bpm-value" id="bpmValue">120</div>
-                <button id="bpmPlus" class="fine-tune-btn">+</button>
+                <div class="bpm-label">BPM</div>
             </div>
-            <div class="bpm-label">BPM</div>
+
+            <!-- Time Sig -->
+            <div class="time-sig-container">
+                <label for="timeSignature">Time Sig</label>
+                <select id="timeSignature">
+                    <option value="2">2/4</option>
+                    <option value="3">3/4</option>
+                    <option value="4" selected>4/4</option>
+                </select>
+            </div>
         </div>
 
         <!-- Quick Pick Tempos -->
@@ -43,6 +47,17 @@
             </div>
         </div>
 
+        <!-- Dial with Side Controls -->
+        <div class="dial-with-controls">
+            <button id="bpmMinus" class="fine-tune-btn side-btn">-</button>
+            <div class="dial-container">
+                <div class="dial" id="tempoDial">
+                    <div class="dial-knob" id="dialKnob"></div>
+                </div>
+            </div>
+            <button id="bpmPlus" class="fine-tune-btn side-btn">+</button>
+        </div>
+
         <!-- Main Action (Play/Stop) -->
         <div class="main-controls">
             <button id="playButton" class="play-btn" aria-label="Start Metronome">
@@ -52,44 +67,43 @@
             </button>
         </div>
 
-        <!-- Tempo Dial -->
-        <div class="dial-container">
-            <div class="dial" id="tempoDial">
-                <div class="dial-knob" id="dialKnob"></div>
-            </div>
+        <!-- Beat Indicators -->
+        <div class="beat-indicators" id="beatIndicators">
+            <!-- Dynamically populated -->
         </div>
 
-        <!-- Secondary Controls -->
-        <div class="secondary-controls">
-            <div class="settings-row">
-                <div class="setting-group">
-                    <label for="timeSignature">Time Sig</label>
-                    <select id="timeSignature">
-                        <option value="2">2/4</option>
-                        <option value="3">3/4</option>
-                        <option value="4" selected>4/4</option>
-                        <option value="6">6/8</option>
-                    </select>
-                </div>
-                <!-- Hidden for Focus Mode -->
-                <div class="setting-group" style="display: none;">
-                    <label for="subdivision">Subdivision</label>
-                    <select id="subdivision">
-                        <option value="1" selected>Quarter</option>
-                        <option value="2">Eighth</option>
-                        <option value="4">Sixteenth</option>
-                    </select>
-                </div>
-                <div class="setting-group" style="display: none;">
-                    <label for="accentToggle">Accent First Beat</label>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="accentToggle">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
+        <!-- Hidden Settings -->
+        <div style="display: none;">
+            <select id="subdivision">
+                <option value="1" selected>Quarter</option>
+                <option value="2">Eighth</option>
+                <option value="4">Sixteenth</option>
+            </select>
+            <input type="checkbox" id="accentToggle">
+        </div>
+    </div>
+
+    <!-- Number Pad Overlay -->
+    <div id="numberPadOverlay" class="numpad-overlay" style="display: none;">
+        <div class="numpad-container">
+            <div class="numpad-display" id="numpadDisplay">0</div>
+            <div class="numpad-grid">
+                <button class="numpad-btn" data-num="7">7</button>
+                <button class="numpad-btn" data-num="8">8</button>
+                <button class="numpad-btn" data-num="9">9</button>
+                <button class="numpad-btn" data-num="4">4</button>
+                <button class="numpad-btn" data-num="5">5</button>
+                <button class="numpad-btn" data-num="6">6</button>
+                <button class="numpad-btn" data-num="1">1</button>
+                <button class="numpad-btn" data-num="2">2</button>
+                <button class="numpad-btn" data-num="3">3</button>
+                <button class="numpad-btn numpad-zero" data-num="0">0</button>
+                <button class="numpad-btn numpad-backspace" data-action="backspace">⌫</button>
+                <button class="numpad-btn numpad-submit" data-action="submit">✓</button>
             </div>
         </div>
     </div>
+
     <script src="main.js"></script>
 </body>
 

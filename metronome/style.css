@@ -3,7 +3,7 @@
     --text-color: #ffffff;
     --accent-color: #ffffff;
     --secondary-color: #2a2a2a;
-    --active-color: #00bcd4;
+    --active-color: #ffe592;
     --dial-track: #1e1e1e;
     --dial-knob: #ffffff;
     --blue-row-bg: rgba(100, 181, 246, 0.15);
@@ -40,82 +40,86 @@ body {
     justify-content: space-evenly;
     align-items: center;
     padding: calc(env(safe-area-inset-top, 20px) + 10px) 20px 20px 20px;
+    position: relative;
 }
 
-/* Beat Indicators - Preserve User's Squircle Shape but enlarged */
-.beat-indicators {
-    display: flex;
-    gap: 15px;
-    margin-bottom: 10px;
-}
-
-.beat-dot {
-    width: 56px;
-    /* Slightly bigger than user's 48px */
-    height: 56px;
-    background-color: var(--secondary-color);
-    border-radius: 25%;
-    /* Squircle from user */
-    transition: background-color 0.1s, box-shadow 0.1s;
-}
-
-.beat-dot.active {
-    background-color: var(--active-color);
-    box-shadow: 0 0 20px var(--active-color);
-}
-
-/* BPM Display */
-.bpm-display {
-    text-align: center;
+/* Header Controls */
+.header-controls {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    /* Centered BPM, Time Sig on right */
+    align-items: start;
     width: 100%;
+    margin-top: 10px;
+}
+
+/* BPM Display - Center cell */
+.bpm-display {
+    grid-column: 2;
+    text-align: center;
 }
 
 .tempo-marking {
-    font-size: 1rem;
+    font-size: 0.9rem;
     opacity: 0.6;
     text-transform: uppercase;
     letter-spacing: 2px;
-}
-
-.bpm-control-wrapper {
+    margin-bottom: 5px;
+    height: 1.2rem;
+    /* Fixed height for alignment */
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 40px;
 }
 
 .bpm-value {
-    font-size: 6rem;
-    /* Restored to 6rem for impact */
-    font-weight: 800;
-    line-height: 1;
-    min-width: 160px;
-}
-
-.fine-tune-btn {
-    background: transparent;
-    border: none;
-    color: white;
     font-size: 5rem;
-    font-weight: 200;
-    /* Thin for balance */
-    cursor: pointer;
-    outline: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 60px;
-    height: 60px;
-}
-
-.fine-tune-btn:active {
-    opacity: 0.5;
+    font-weight: 650;
+    line-height: 1;
 }
 
 .bpm-label {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     opacity: 0.4;
     letter-spacing: 1px;
+    margin-top: 5px;
+}
+
+/* Time Sig - Right cell */
+.time-sig-container {
+    grid-column: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    /* Align to right edge */
+    justify-self: end;
+}
+
+.time-sig-container label {
+    font-size: 0.65rem;
+    opacity: 0.5;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+    height: 1.2rem;
+    /* Match tempo-marking height */
+    display: flex;
+    align-items: center;
+}
+
+.time-sig-container select {
+    background-color: #222;
+    color: white;
+    border: 1px solid #444;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: center;
+    cursor: pointer;
 }
 
 /* Quick Pick Container */
@@ -124,6 +128,7 @@ body {
     flex-direction: column;
     gap: 12px;
     width: 100%;
+    max-width: 550px;
 }
 
 .quick-pick-row {
@@ -155,6 +160,7 @@ body {
     cursor: pointer;
     background: transparent;
     color: white;
+    flex-shrink: 0;
 }
 
 .row-blue .edit-btn {
@@ -213,31 +219,34 @@ body {
     }
 }
 
-/* Play Button */
-.main-controls {
-    margin: 10px 0;
-}
-
-.play-btn {
-    background-color: var(--active-color);
-    border: none;
-    color: #121212;
-    border-radius: 50%;
-    width: 90px;
-    height: 90px;
+/* Dial with Side Controls */
+.dial-with-controls {
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 30px;
+    width: 100%;
+}
+
+.side-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 4rem;
+    font-weight: 200;
     cursor: pointer;
-    box-shadow: 0 0 20px rgba(0, 188, 212, 0.4);
-    transition: transform 0.1s, box-shadow 0.2s;
+    outline: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 70px;
+    height: 70px;
 }
 
-.play-btn:active {
-    transform: scale(0.95);
+.side-btn:active {
+    opacity: 0.5;
 }
 
-/* Dial Overlay Styles */
 .dial-container {
     position: relative;
     width: 210px;
@@ -277,49 +286,134 @@ body {
     transform: translate(-50%, -50%);
 }
 
-/* Settings */
-.secondary-controls {
-    width: 100%;
+/* Play Button */
+.main-controls {
+    margin: 10px 0;
 }
 
-.settings-row {
-    display: flex;
-    justify-content: center;
-}
-
-.setting-group {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-}
-
-select {
+.play-btn {
     background-color: #222;
-    color: white;
     border: 1px solid #444;
-    padding: 10px 20px;
-    border-radius: 10px;
-    font-size: 1rem;
-    font-weight: 600;
-    outline: none;
-    -webkit-appearance: none;
-    appearance: none;
-    text-align: center;
+    color: white;
+    border-radius: 50%;
+    width: 90px;
+    height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
+    transition: transform 0.1s, background-color 0.2s;
 }
 
-select:focus {
+.play-btn:active {
+    transform: scale(0.95);
+    background-color: #2a2a2a;
+}
+
+/* Beat Indicators at Bottom */
+.beat-indicators {
+    display: flex;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.beat-dot {
+    width: 56px;
+    height: 56px;
+    background-color: var(--secondary-color);
+    border-radius: 25%;
+    transition: background-color 0.1s, box-shadow 0.1s;
+}
+
+.beat-dot.active {
+    background-color: var(--active-color);
+    box-shadow: 0 0 20px var(--active-color);
+}
+
+/* Number Pad Overlay */
+.numpad-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.numpad-container {
+    background: #1a1a1a;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+    max-width: 320px;
+}
+
+.numpad-display {
+    background: #000;
+    color: white;
+    font-size: 2.5rem;
+    font-weight: bold;
+    text-align: right;
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.numpad-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.numpad-btn {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: white;
+    font-size: 1.8rem;
+    font-weight: 600;
+    padding: 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.numpad-btn:active {
+    background: #444;
+    transform: scale(0.95);
+}
+
+.numpad-zero {
+    grid-column: span 1;
+}
+
+.numpad-backspace {
+    background: #ff5555;
+    border-color: #ff5555;
+}
+
+.numpad-backspace:active {
+    background: #ff3333;
+}
+
+.numpad-submit {
+    background: var(--active-color);
     border-color: var(--active-color);
+    color: #121212;
 }
 
-label {
-    font-size: 0.7rem;
-    opacity: 0.5;
-    letter-spacing: 1px;
+.numpad-submit:active {
+    background: #00a0b2;
 }
 
-/* Custom Scrollbar for hidden elements if any */
+/* Hide scrollbars */
 ::-webkit-scrollbar {
     display: none;
 }
