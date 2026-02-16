@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#121212">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <title>Metronome</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Beat Indicators -->
+        <div class="beat-indicators" id="beatIndicators">
+            <!-- Dynamically populated -->
+        </div>
+
+        <!-- BPM Display -->
+        <div class="bpm-display">
+            <div class="tempo-marking" id="tempoMarking">Moderato</div>
+            <div class="bpm-value" id="bpmValue">120</div>
+            <div class="bpm-label">BPM</div>
+        </div>
+
+        <!-- Quick Pick Tempos -->
+        <div class="quick-pick-tempos">
+            <button class="tempo-btn" data-bpm="60">60</button>
+            <button class="tempo-btn" data-bpm="72">72</button>
+            <button class="tempo-btn" data-bpm="80">80</button>
+            <button class="tempo-btn" data-bpm="92">92</button>
+            <button class="tempo-btn" data-bpm="100">100</button>
+            <button class="tempo-btn" data-bpm="120">120</button>
+        </div>
+
+        <!-- Tempo Dial -->
+        <div class="dial-container">
+            <div class="dial" id="tempoDial">
+                <div class="dial-knob" id="dialKnob"></div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <!-- Play/Stop -->
+            <button id="playButton" class="play-btn" aria-label="Start Metronome">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
+                    <path d="M8 5v14l11-7z" />
+                </svg>
+            </button>
+
+            <!-- Settings Row -->
+            <div class="settings-row">
+                <div class="setting-group">
+                    <label for="timeSignature">Time Sig</label>
+                    <select id="timeSignature">
+                        <option value="2">2/4</option>
+                        <option value="3">3/4</option>
+                        <option value="4" selected>4/4</option>
+                        <option value="6">6/8</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label for="subdivision">Subdivision</label>
+                    <select id="subdivision">
+                        <option value="1" selected>Quarter</option>
+                        <option value="2">Eighth</option>
+                        <option value="4">Sixteenth</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label for="accentToggle">Accent First Beat</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="accentToggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="main.js"></script>
+</body>
+
+</html>

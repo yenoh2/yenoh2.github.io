@@ -1,0 +1,40 @@
+/* Quick Pick Tempos */
+.quick-pick-tempos {
+    display: flex;
+    gap: 8px;
+    margin: 15px 0;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.tempo-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+    min-width: 50px;
+    backdrop-filter: blur(10px);
+}
+
+.tempo-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.tempo-btn:active {
+    background: var(--active-color);
+    border-color: var(--active-color);
+    transform: scale(0.95);
+}
+
+.tempo-btn.active {
+    background: var(--active-color);
+    border-color: var(--active-color);
+    box-shadow: 0 0 10px var(--active-color);
+}
