@@ -2,10 +2,14 @@
     --bg-color: #121212;
     --text-color: #ffffff;
     --accent-color: #ffffff;
-    --secondary-color: #333333;
+    --secondary-color: #2a2a2a;
     --active-color: #00bcd4;
-    --dial-track: #2a2a2a;
+    --dial-track: #1e1e1e;
     --dial-knob: #ffffff;
+    --blue-row-bg: rgba(100, 181, 246, 0.15);
+    --blue-accent: #64b5f6;
+    --pink-row-bg: rgba(244, 143, 177, 0.15);
+    --pink-accent: #f48fb1;
 }
 
 * {
@@ -33,126 +37,222 @@ body {
     max-width: 600px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: space-evenly;
     align-items: center;
-    padding: 20px 20px;
-    /* Reduced vertical padding for better spacing */
+    padding: calc(env(safe-area-inset-top, 20px) + 10px) 20px 20px 20px;
 }
 
-/* Beat Indicators */
+/* Beat Indicators - Preserve User's Squircle Shape but enlarged */
 .beat-indicators {
     display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
+    gap: 15px;
+    margin-bottom: 10px;
 }
 
 .beat-dot {
-    width: 12px;
-    height: 12px;
+    width: 56px;
+    /* Slightly bigger than user's 48px */
+    height: 56px;
     background-color: var(--secondary-color);
-    border-radius: 50%;
-    transition: background-color 0.1s;
+    border-radius: 25%;
+    /* Squircle from user */
+    transition: background-color 0.1s, box-shadow 0.1s;
 }
 
 .beat-dot.active {
     background-color: var(--active-color);
-    box-shadow: 0 0 10px var(--active-color);
-}
-
-.beat-dot.accent {
-    width: 16px;
-    height: 16px;
+    box-shadow: 0 0 20px var(--active-color);
 }
 
 /* BPM Display */
 .bpm-display {
     text-align: center;
-    margin: 10px 0;
+    width: 100%;
 }
 
 .tempo-marking {
-    font-size: 1.2rem;
-    opacity: 0.7;
-    margin-bottom: 5px;
+    font-size: 1rem;
+    opacity: 0.6;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
+}
+
+.bpm-control-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
 }
 
 .bpm-value {
     font-size: 6rem;
-    font-weight: bold;
+    /* Restored to 6rem for impact */
+    font-weight: 800;
     line-height: 1;
+    min-width: 160px;
 }
 
-.bpm-label {
-    font-size: 1rem;
+.fine-tune-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 5rem;
+    font-weight: 200;
+    /* Thin for balance */
+    cursor: pointer;
+    outline: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+}
+
+.fine-tune-btn:active {
     opacity: 0.5;
 }
 
-/* Quick Pick Tempos */
-.quick-pick-tempos {
+.bpm-label {
+    font-size: 0.9rem;
+    opacity: 0.4;
+    letter-spacing: 1px;
+}
+
+/* Quick Pick Container */
+.quick-pick-container {
     display: flex;
+    flex-direction: column;
     gap: 12px;
-    margin: 20px 0;
-    justify-content: center;
-    flex-wrap: wrap;
     width: 100%;
-    padding: 0 10px;
+}
+
+.quick-pick-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 15px;
+    border-radius: 40px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.row-blue {
+    background: var(--blue-row-bg);
+}
+
+.row-pink {
+    background: var(--pink-row-bg);
+}
+
+.edit-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.row-blue .edit-btn {
+    background: var(--blue-accent);
+    color: #121212;
+}
+
+.row-pink .edit-btn {
+    background: var(--pink-accent);
+    color: #121212;
+}
+
+.edit-btn.editing {
+    transform: scale(1.1);
+    box-shadow: 0 0 10px white;
 }
 
 .tempo-btn {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    flex: 1;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     color: white;
-    padding: 12px 24px;
-    /* Larger padding for touch */
-    border-radius: 25px;
-    /* Larger radius */
-    font-size: 1.1rem;
-    /* Larger font */
-    font-weight: 500;
+    padding: 10px 0;
+    border-radius: 20px;
+    font-size: 1rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    outline: none;
-    min-width: 70px;
-    backdrop-filter: blur(10px);
-    touch-action: manipulation;
 }
 
-.tempo-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.3);
+.row-blue .tempo-btn.active {
+    background: var(--blue-accent);
+    color: #121212;
+    border-color: var(--blue-accent);
 }
 
-.tempo-btn:active {
-    background: var(--active-color);
-    border-color: var(--active-color);
+.row-pink .tempo-btn.active {
+    background: var(--pink-accent);
+    color: #121212;
+    border-color: var(--pink-accent);
+}
+
+.editing-pulse {
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+/* Play Button */
+.main-controls {
+    margin: 10px 0;
+}
+
+.play-btn {
+    background-color: var(--active-color);
+    border: none;
+    color: #121212;
+    border-radius: 50%;
+    width: 90px;
+    height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(0, 188, 212, 0.4);
+    transition: transform 0.1s, box-shadow 0.2s;
+}
+
+.play-btn:active {
     transform: scale(0.95);
 }
 
-.tempo-btn.active {
-    background: var(--active-color);
-    border-color: var(--active-color);
-    box-shadow: 0 0 10px var(--active-color);
-}
-
-/* Dial Container */
+/* Dial Overlay Styles */
 .dial-container {
     position: relative;
-    width: 280px;
-    height: 280px;
-    margin: 20px 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    width: 210px;
+    height: 210px;
 }
 
 .dial {
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    background: radial-gradient(circle, #1e1e1e 60%, #121212 100%);
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.5);
+    background: radial-gradient(circle, #2a2a2a 0%, #1a1a1a 100%);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(255, 255, 255, 0.05);
+    border: 2px solid #333;
     position: relative;
     touch-action: none;
 }
@@ -160,137 +260,68 @@ body {
 .dial::before {
     content: '';
     position: absolute;
-    top: 10px;
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
     border-radius: 50%;
-    border: 2px solid var(--dial-track);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .dial-knob {
     position: absolute;
-    width: 30px;
-    height: 30px;
-    background-color: var(--dial-knob);
+    width: 28px;
+    height: 28px;
+    background-color: #fff;
     border-radius: 50%;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
     pointer-events: none;
+    transform: translate(-50%, -50%);
 }
 
-/* Controls */
-.controls {
+/* Settings */
+.secondary-controls {
     width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-}
-
-.play-btn {
-    background-color: transparent;
-    border: 2px solid var(--text-color);
-    color: var(--text-color);
-    border-radius: 50%;
-    width: 80px;
-    height: 80px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: transform 0.1s, background-color 0.2s;
-    outline: none;
-}
-
-.play-btn:active {
-    transform: scale(0.95);
-    background-color: rgba(255, 255, 255, 0.1);
 }
 
 .settings-row {
     display: flex;
-    gap: 30px;
-    width: 100%;
     justify-content: center;
-    flex-wrap: wrap;
-    /* Ensure wrapping on small screens */
 }
 
 .setting-group {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
 }
 
-label {
-    font-size: 0.8rem;
-    opacity: 0.6;
-    text-transform: uppercase;
+.select-wrapper {
+    background: #222;
+    border-radius: 10px;
+    padding: 5px 15px;
+    border: 1px solid #333;
 }
 
 select {
-    background-color: #222;
+    background: transparent;
     color: white;
-    border: 1px solid #444;
-    padding: 8px 12px;
-    border-radius: 8px;
+    border: none;
     font-size: 1rem;
+    font-weight: 600;
     outline: none;
     appearance: none;
     -webkit-appearance: none;
     text-align: center;
 }
 
-/* Toggle Switch */
-.toggle-switch {
-    position: relative;
-    display: inline-block;
-    width: 50px;
-    height: 24px;
+label {
+    font-size: 0.7rem;
+    opacity: 0.5;
+    letter-spacing: 1px;
 }
 
-.toggle-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #444;
-    transition: .4s;
-    border-radius: 24px;
-}
-
-.slider:before {
-    position: absolute;
-    content: "";
-    height: 18px;
-    width: 18px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: .4s;
-    border-radius: 50%;
-}
-
-input:checked+.slider {
-    background-color: var(--active-color);
-}
-
-input:focus+.slider {
-    box-shadow: 0 0 1px var(--active-color);
-}
-
-input:checked+.slider:before {
-    transform: translateX(26px);
+/* Custom Scrollbar for hidden elements if any */
+::-webkit-scrollbar {
+    display: none;
 }

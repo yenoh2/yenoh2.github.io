@@ -5,15 +5,22 @@
 
 // --- Constants & Global State ---
 const MIN_BPM = 20;
-const MAX_BPM = 300;
+const MAX_BPM = 230; // Updated max
 let bpm = 120;
 let isPlaying = false;
 let timeSignature = 4;
 let subdivision = 1;
-let isAccentEnabled = false;
+let isAccentEnabled = false; // Hidden default
 let currentBeat = 0;
 let nextNoteTime = 0.0;
 const scheduleAheadTime = 0.1;
+
+// Quick Pick State
+let quickPicks = {
+    row1: [60, 70, 80, 90, 100, 120],
+    row2: [60, 70, 80, 90, 100, 120]
+};
+let isEditing = { row1: false, row2: false };
 
 // Audio Context
 let audioCtx = null;
@@ -28,15 +35,21 @@ const dialKnob = document.getElementById('dialKnob');
 const timeSigSelect = document.getElementById('timeSignature');
 const subdivSelect = document.getElementById('subdivision');
 const accentToggle = document.getElementById('accentToggle');
+const bpmMinusBtn = document.getElementById('bpmMinus');
+const bpmPlusBtn = document.getElementById('bpmPlus');
+const row1El = document.getElementById('quickPickRow1');
+const row2El = document.getElementById('quickPickRow2');
+const editRow1Btn = document.getElementById('editRow1');
+const editRow2Btn = document.getElementById('editRow2');
 
 // --- Initialization ---
 
 function init() {
     loadSettings();
     updateUI();
+    renderQuickPicks();
     setupEventListeners();
     setupDial();
-    setupQuickPickTempos();
 }
 
 // --- Audio Engine ---
@@ -210,8 +223,17 @@ function updateDialPosition() {
     const x = radius * Math.cos(radians);
     const y = radius * Math.sin(radians);
 
-    dialKnob.style.left = `calc(50% + ${x}px)`;
-    dialKnob.style.top = `calc(50% + ${y}px)`;
+    // Scaling the visual knob position to match smaller dial? 
+    // The CSS reduced dial size, but JS calculations here are relative to center
+    // Let's adjust radius to match CSS (210px / 2 = 105px, allow padding)
+    // CSS dial is 210px. Radius is ~90-95px? 
+    // knob is absolute positioned. Let's try 80 for the smaller dial.
+    const dialRadius = 80;
+    const kX = dialRadius * Math.cos(radians);
+    const kY = dialRadius * Math.sin(radians);
+
+    dialKnob.style.left = `calc(50% + ${kX}px)`;
+    dialKnob.style.top = `calc(50% + ${kY}px)`;
 }
 
 // --- Dial Interaction ---
@@ -277,6 +299,7 @@ function setupEventListeners() {
         saveSettings();
     });
 
+    // Hidden input listeners for robust state
     subdivSelect.addEventListener('change', (e) => {
         subdivision = parseInt(e.target.value);
         currentBeat = 0;
@@ -288,28 +311,106 @@ function setupEventListeners() {
         updateBeatIndicators();
         saveSettings();
     });
+
+    // Fine Tune
+    bpmMinusBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        bpm = Math.max(MIN_BPM, Math.round(bpm) - 1);
+        updateUI();
+        saveSettings();
+    });
+
+    bpmPlusBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        bpm = Math.min(MAX_BPM, Math.round(bpm) + 1);
+        updateUI();
+        saveSettings();
+    });
+
+    // Edit Buttons
+    editRow1Btn.addEventListener('click', () => toggleEditMode('row1'));
+    editRow2Btn.addEventListener('click', () => toggleEditMode('row2'));
 }
 
 // --- Quick Pick Tempos ---
-function setupQuickPickTempos() {
-    const tempoButtons = document.querySelectorAll('.tempo-btn');
 
-    tempoButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const targetBpm = parseInt(btn.dataset.bpm);
-            bpm = targetBpm;
-            updateUI();
-            updateQuickPickActive();
-            saveSettings();
+function renderQuickPicks() {
+    // Clear existing buttons (keeping edit btn)
+    const renderRow = (rowId, data, rowKey) => {
+        const container = document.getElementById(rowId);
+        // Remove old buttons, keep first child (edit btn)
+        while (container.children.length > 1) {
+            container.removeChild(container.lastChild);
+        }
+
+        data.forEach((val, index) => {
+            const btn = document.createElement('button');
+            btn.className = 'tempo-btn';
+            btn.textContent = val;
+            btn.dataset.bpm = val;
+            btn.dataset.index = index;
+            btn.dataset.row = rowKey;
+
+            btn.addEventListener('click', () => handleQuickPickClick(rowKey, index, val));
+
+            if (isEditing[rowKey]) {
+                btn.classList.add('editing-pulse');
+            }
+
+            container.appendChild(btn);
         });
-    });
+    };
+
+    renderRow('quickPickRow1', quickPicks.row1, 'row1');
+    renderRow('quickPickRow2', quickPicks.row2, 'row2');
+    updateQuickPickActive();
+}
+
+function handleQuickPickClick(rowKey, index, val) {
+    if (isEditing[rowKey]) {
+        // Edit Mode: Prompt to change value
+        const newVal = prompt(`Enter new BPM for ${rowKey === 'row1' ? 'Blue' : 'Pink'} Row:`, val);
+        if (newVal !== null) {
+            const parsed = parseInt(newVal);
+            if (!isNaN(parsed) && parsed >= MIN_BPM && parsed <= MAX_BPM) {
+                quickPicks[rowKey][index] = parsed;
+                renderQuickPicks();
+                saveSettings();
+            } else {
+                alert(`Please enter a number between ${MIN_BPM} and ${MAX_BPM}`);
+            }
+        }
+    } else {
+        // Normal Mode: Set BPM
+        bpm = val;
+        updateUI();
+        updateQuickPickActive();
+        saveSettings();
+    }
+}
+
+function toggleEditMode(rowKey) {
+    isEditing[rowKey] = !isEditing[rowKey];
+
+    // Visual feedback for edit button
+    const btnId = rowKey === 'row1' ? 'editRow1' : 'editRow2';
+    const btn = document.getElementById(btnId);
+    if (isEditing[rowKey]) {
+        btn.classList.add('editing');
+        btn.textContent = '✓'; // Checkmark
+    } else {
+        btn.classList.remove('editing');
+        btn.textContent = '✎'; // Pencil
+    }
+
+    renderQuickPicks();
 }
 
 function updateQuickPickActive() {
-    const tempoButtons = document.querySelectorAll('.tempo-btn');
     const currentBpm = Math.round(bpm);
+    const buttons = document.querySelectorAll('.tempo-btn');
 
-    tempoButtons.forEach(btn => {
+    buttons.forEach(btn => {
         const btnBpm = parseInt(btn.dataset.bpm);
         if (btnBpm === currentBpm) {
             btn.classList.add('active');
@@ -324,12 +425,18 @@ function loadSettings() {
     const savedTimeSig = localStorage.getItem('metronome_timeSig');
     const savedSubdiv = localStorage.getItem('metronome_subdiv');
     const savedAccent = localStorage.getItem('metronome_accent');
+    const savedQuickPicks = localStorage.getItem('metronome_quickPicks');
 
     if (savedBpm) bpm = parseInt(savedBpm);
+
+    // Focus Mode Defaults: Force 4/4 if not set, but respect saved
     if (savedTimeSig) {
         timeSignature = parseInt(savedTimeSig);
         timeSigSelect.value = timeSignature;
     }
+
+    // Force Defaults for Focus Mode if user hasn't explicitly set them?
+    // User requested "Hide", typically implies revert to default simple behavior.
     if (savedSubdiv) {
         subdivision = parseInt(savedSubdiv);
         subdivSelect.value = subdivision;
@@ -338,6 +445,14 @@ function loadSettings() {
         isAccentEnabled = (savedAccent === 'true');
         accentToggle.checked = isAccentEnabled;
     }
+
+    if (savedQuickPicks) {
+        try {
+            quickPicks = JSON.parse(savedQuickPicks);
+        } catch (e) {
+            console.error("Failed to parse quick picks", e);
+        }
+    }
 }
 
 function saveSettings() {
@@ -345,6 +460,7 @@ function saveSettings() {
     localStorage.setItem('metronome_timeSig', timeSignature);
     localStorage.setItem('metronome_subdiv', subdivision);
     localStorage.setItem('metronome_accent', isAccentEnabled);
+    localStorage.setItem('metronome_quickPicks', JSON.stringify(quickPicks));
 }
 
 // Start
