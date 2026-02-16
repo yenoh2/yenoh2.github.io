@@ -144,32 +144,30 @@ body {
 }
 
 .edit-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    border-radius: 0;
     border: none;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1rem;
+    font-size: 1.8rem;
     cursor: pointer;
-    background: rgba(255, 255, 255, 0.1);
+    background: transparent;
     color: white;
 }
 
 .row-blue .edit-btn {
-    background: var(--blue-accent);
-    color: #121212;
+    color: var(--blue-accent);
 }
 
 .row-pink .edit-btn {
-    background: var(--pink-accent);
-    color: #121212;
+    color: var(--pink-accent);
 }
 
 .edit-btn.editing {
-    transform: scale(1.1);
-    box-shadow: 0 0 10px white;
+    transform: scale(1.2);
+    filter: drop-shadow(0 0 8px currentColor);
 }
 
 .tempo-btn {
