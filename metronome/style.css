@@ -296,23 +296,23 @@ body {
     gap: 8px;
 }
 
-.select-wrapper {
-    background: #222;
-    border-radius: 10px;
-    padding: 5px 15px;
-    border: 1px solid #333;
-}
-
 select {
-    background: transparent;
+    background-color: #222;
     color: white;
-    border: none;
+    border: 1px solid #444;
+    padding: 10px 20px;
+    border-radius: 10px;
     font-size: 1rem;
     font-weight: 600;
     outline: none;
-    appearance: none;
     -webkit-appearance: none;
+    appearance: none;
     text-align: center;
+    cursor: pointer;
+}
+
+select:focus {
+    border-color: var(--active-color);
 }
 
 label {
