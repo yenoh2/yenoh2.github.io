@@ -60,40 +60,72 @@ function init() {
 
 // --- Audio Engine ---
 
+let woodblockHighBuffer = null;
+let woodblockLowBuffer = null;
+
 function unlockAudioContext() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Start rendering buffers immediately
+        renderOfflineWoodblock(1200).then(buffer => {
+            woodblockHighBuffer = buffer;
+        });
+        renderOfflineWoodblock(800).then(buffer => {
+            woodblockLowBuffer = buffer;
+        });
     }
     if (audioCtx.state === 'suspended') {
         audioCtx.resume();
     }
 }
 
-// Woodblock Synthesis
-function playClick(time, beatNumber) {
-    const osc = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
+// Render sound using OfflineAudioContext (The "Baking" process)
+async function renderOfflineWoodblock(baseFreq) {
+    const duration = 0.1;
+    const sampleRate = 44100; // Standard CD quality
+    const offlineCtx = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+
+    const osc = offlineCtx.createOscillator();
+    const gainNode = offlineCtx.createGain();
 
     osc.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-
-    const isAccent = isAccentEnabled && (beatNumber % timeSignature === 0);
-    // Standard woodblock frequencies: ~800Hz (high/accent), ~600Hz (low)
-    // Adjusting for a pleasant digital woodblock
-    const baseFreq = isAccent ? 1200 : 800;
+    gainNode.connect(offlineCtx.destination);
 
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(baseFreq, time);
-    // Slight pitch drop for "thwack" attack
-    osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.8, time + 0.02);
+    osc.frequency.setValueAtTime(baseFreq, 0);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.8, 0.02);
 
-    // Envelope: Sharp attack, quick exponential decay
-    gainNode.gain.setValueAtTime(0, time);
-    gainNode.gain.linearRampToValueAtTime(isAccent ? 1.0 : 0.7, time + 0.001);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+    gainNode.gain.setValueAtTime(0, 0);
+    gainNode.gain.linearRampToValueAtTime(1.0, 0.001); // High gain for offline render
+    gainNode.gain.exponentialRampToValueAtTime(0.001, 0.1);
 
-    osc.start(time);
-    osc.stop(time + 0.1);
+    osc.start(0);
+    osc.stop(0.1);
+
+    return await offlineCtx.startRendering();
+}
+
+
+// Play the pre-rendered buffer
+function playClick(time, beatNumber) {
+    const isAccent = isAccentEnabled && (beatNumber % timeSignature === 0);
+    const bufferToPlay = isAccent ? woodblockHighBuffer : woodblockLowBuffer;
+
+    // Only play if buffer is ready (unlocked and rendered)
+    if (bufferToPlay) {
+        const source = audioCtx.createBufferSource();
+        source.buffer = bufferToPlay;
+
+        // Global Volume for the click to prevent clipping
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.value = 0.5; // Reduced from 0.7 to 0.5 for headroom
+
+        source.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        source.start(time);
+    }
 
     // Animate visual
     const drawTime = (time - audioCtx.currentTime) * 1000;
