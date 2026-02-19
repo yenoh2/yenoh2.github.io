@@ -47,6 +47,7 @@ const numpadDisplay = document.getElementById('numpadDisplay');
 // Number Pad State
 let numpadValue = '';
 let numpadCallback = null;
+let numpadIsFirstInput = false;
 
 // --- Initialization ---
 
@@ -250,22 +251,14 @@ function updateTempoMarking() {
     tempoMarkingEl.textContent = text;
 }
 
+// Dial state for indeterminate (relative) rotation
+let dialAngle = 0;   // Current visual angle of the knob (degrees)
+let lastAngle = null; // Previous pointer angle during drag
+const DEGREES_PER_BPM = 3; // Sensitivity: 3° of rotation = 1 BPM change
+
 function updateDialPosition() {
-    // Calculate angle based on BPM
-    const range = MAX_BPM - MIN_BPM;
-    const normalized = (bpm - MIN_BPM) / range;
-    const angle = normalized * 270 - 135; // -135° to +135°
-
-    const radius = 125; // Distance from center
-    const radians = (angle * Math.PI) / 180;
-    const x = radius * Math.cos(radians);
-    const y = radius * Math.sin(radians);
-
-    // Scaling the visual knob position to match smaller dial? 
-    // The CSS reduced dial size, but JS calculations here are relative to center
-    // Let's adjust radius to match CSS (210px / 2 = 105px, allow padding)
-    // CSS dial is 210px. Radius is ~90-95px? 
-    // knob is absolute positioned. Let's try 80 for the smaller dial.
+    // Position the knob based on the current dialAngle
+    const radians = (dialAngle * Math.PI) / 180;
     const dialRadius = 80;
     const kX = dialRadius * Math.cos(radians);
     const kY = dialRadius * Math.sin(radians);
@@ -277,53 +270,69 @@ function updateDialPosition() {
 // --- Dial Interaction ---
 let isDragging = false;
 
-function setupDial() {
-    const onMove = (clientX, clientY) => {
-        const rect = tempoDial.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
+function getPointerAngle(clientX, clientY) {
+    const rect = tempoDial.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = clientX - centerX;
+    const dy = clientY - centerY;
+    return Math.atan2(dy, dx) * (180 / Math.PI); // -180 to 180
+}
 
-        const dx = clientX - centerX;
-        const dy = clientY - centerY;
+function onDialMove(clientX, clientY) {
+    const angle = getPointerAngle(clientX, clientY);
 
-        let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    if (lastAngle !== null) {
+        // Calculate angular delta, handling wrap-around (-180/180 boundary)
+        let delta = angle - lastAngle;
+        if (delta > 180) delta -= 360;
+        if (delta < -180) delta += 360;
 
-        // Constrain to -135° to +135°
-        if (angle < -135) angle = -135;
-        if (angle > 135) angle = 135;
+        // Apply delta to BPM at the configured sensitivity
+        const bpmDelta = delta / DEGREES_PER_BPM;
+        bpm = Math.max(MIN_BPM, Math.min(MAX_BPM, bpm + bpmDelta));
 
-        const normalized = (angle + 135) / 270;
-        bpm = MIN_BPM + normalized * (MAX_BPM - MIN_BPM);
-        bpm = Math.max(MIN_BPM, Math.min(MAX_BPM, bpm));
+        // Update the visual knob angle (free-spinning, no clamp)
+        dialAngle += delta;
 
         updateUI();
         saveSettings();
-    };
+    }
 
+    lastAngle = angle;
+}
+
+function setupDial() {
     tempoDial.addEventListener('mousedown', (e) => {
         isDragging = true;
-        onMove(e.clientX, e.clientY);
+        lastAngle = getPointerAngle(e.clientX, e.clientY);
     });
 
     tempoDial.addEventListener('touchstart', (e) => {
         isDragging = true;
         const touch = e.touches[0];
-        onMove(touch.clientX, touch.clientY);
+        lastAngle = getPointerAngle(touch.clientX, touch.clientY);
     });
 
     document.addEventListener('mousemove', (e) => {
-        if (isDragging) onMove(e.clientX, e.clientY);
+        if (isDragging) onDialMove(e.clientX, e.clientY);
     });
 
     document.addEventListener('touchmove', (e) => {
         if (isDragging) {
             const touch = e.touches[0];
-            onMove(touch.clientX, touch.clientY);
+            onDialMove(touch.clientX, touch.clientY);
         }
     });
 
-    document.addEventListener('mouseup', () => isDragging = false);
-    document.addEventListener('touchend', () => isDragging = false);
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+        lastAngle = null;
+    });
+    document.addEventListener('touchend', () => {
+        isDragging = false;
+        lastAngle = null;
+    });
 }
 
 // --- Event Listeners ---
@@ -506,6 +515,7 @@ function saveSettings() {
 function showNumberPad(currentValue, callback) {
     numpadValue = String(currentValue);
     numpadCallback = callback;
+    numpadIsFirstInput = true;
     numpadDisplay.textContent = numpadValue;
     numberPadOverlay.style.display = 'flex';
 }
@@ -518,8 +528,13 @@ function hideNumberPad() {
 
 function handleNumpadInput(input) {
     if (input === 'backspace') {
-        numpadValue = numpadValue.slice(0, -1);
-        if (numpadValue === '') numpadValue = '0';
+        if (numpadIsFirstInput) {
+            numpadValue = '0';
+            numpadIsFirstInput = false;
+        } else {
+            numpadValue = numpadValue.slice(0, -1);
+            if (numpadValue === '') numpadValue = '0';
+        }
     } else if (input === 'submit') {
         if (numpadCallback) {
             numpadCallback(numpadValue);
@@ -527,8 +542,9 @@ function handleNumpadInput(input) {
         hideNumberPad();
     } else {
         // Number input
-        if (numpadValue === '0') {
+        if (numpadIsFirstInput || numpadValue === '0') {
             numpadValue = input;
+            numpadIsFirstInput = false;
         } else {
             numpadValue += input;
         }
