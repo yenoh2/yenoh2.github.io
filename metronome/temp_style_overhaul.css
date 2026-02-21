@@ -229,9 +229,9 @@ body {
 /* Dial Container - Reduced 25% */
 .dial-container {
     position: relative;
-    width: 210px;
-    /* Reduced from 280px */
-    height: 210px;
+    width: min(210px, 50vw, 40vh);
+    height: min(210px, 50vw, 40vh);
+    flex-shrink: 0;
     margin: 10px 0;
     display: flex;
     justify-content: center;
