@@ -193,11 +193,13 @@ function togglePlay() {
     if (isPlaying) {
         currentBeat = 0;
         nextNoteTime = audioCtx.currentTime + 0.05;
-        playButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+        playButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="80" height="80"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+        playButton.classList.add('playing');
         requestWakeLock();
         scheduler();
     } else {
-        playButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M8 5v14l11-7z"/></svg>`;
+        playButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="80" height="80"><path d="M8 5v14l11-7z"/></svg>`;
+        playButton.classList.remove('playing');
         releaseWakeLock();
         resetVisuals();
     }
@@ -336,8 +338,40 @@ function setupDial() {
 }
 
 // --- Event Listeners ---
+const mainControls = document.querySelector('.main-controls');
+
+function spawnRipple(x, y) {
+    const rect = mainControls.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height) * 0.6;
+    const ripple = document.createElement('span');
+    ripple.className = 'play-zone-ripple';
+    ripple.style.width = ripple.style.height = size + 'px';
+    ripple.style.left = (x - rect.left - size / 2) + 'px';
+    ripple.style.top = (y - rect.top - size / 2) + 'px';
+    mainControls.appendChild(ripple);
+    ripple.addEventListener('animationend', () => ripple.remove());
+}
+
+function triggerPlayZoneTap(x, y) {
+    spawnRipple(x, y);
+    // Tactile press animation on the button
+    playButton.classList.add('pressed');
+    setTimeout(() => playButton.classList.remove('pressed'), 150);
+    togglePlay();
+}
+
 function setupEventListeners() {
-    playButton.addEventListener('click', togglePlay);
+    // Wire the whole play zone, not just the small button
+    mainControls.addEventListener('click', (e) => {
+        triggerPlayZoneTap(e.clientX, e.clientY);
+    });
+
+    mainControls.addEventListener('touchstart', (e) => {
+        // Prevent ghost click from also firing
+        e.preventDefault();
+        const t = e.touches[0];
+        triggerPlayZoneTap(t.clientX, t.clientY);
+    }, { passive: false });
 
     timeSigSelect.addEventListener('change', (e) => {
         timeSignature = parseInt(e.target.value);

@@ -288,28 +288,74 @@ body {
     transform: translate(-50%, -50%);
 }
 
-/* Play Button */
+/* Play Zone (large tap target) */
 .main-controls {
-    margin: 10px 0;
-}
-
-.play-btn {
-    background-color: #222;
-    border: 1px solid #444;
-    color: white;
-    border-radius: 50%;
-    width: 90px;
-    height: 90px;
+    flex-grow: 1;
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform 0.1s, background-color 0.2s;
+    position: relative;
+    overflow: hidden;
+    /* Subtle ambient glow hinting interactivity */
+    background: radial-gradient(ellipse 70% 60% at 50% 100%,
+            rgba(255, 255, 255, 0.04) 0%,
+            transparent 100%);
+    border-radius: 24px 24px 0 0;
+    /* Active state: deepen the glow on press */
+    transition: background 0.15s ease;
 }
 
-.play-btn:active {
-    transform: scale(0.95);
-    background-color: #2a2a2a;
+.main-controls:active {
+    background: radial-gradient(ellipse 70% 60% at 50% 100%,
+            rgba(255, 255, 255, 0.09) 0%,
+            transparent 100%);
+}
+
+/* Ripple effect on tap */
+.play-zone-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    transform: scale(0);
+    animation: zone-ripple 0.5s ease-out forwards;
+    pointer-events: none;
+}
+
+@keyframes zone-ripple {
+    to {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+/* Play Button — no circle, just the icon */
+.play-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    pointer-events: none;
+    /* Zone handles the click */
+    transition: transform 0.12s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.2s;
+    opacity: 0.85;
+}
+
+/* Pressed state triggered by JS on zone tap */
+.play-btn.pressed {
+    transform: scale(0.88);
+    opacity: 1;
+}
+
+/* Glowing icon when metronome is playing */
+.play-btn.playing {
+    opacity: 1;
+    filter: drop-shadow(0 0 14px rgba(255, 229, 146, 0.55));
+    color: var(--active-color);
 }
 
 /* Beat Indicators at Bottom */
