@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Plan irrigation sprinkler layouts with calibrated background images, zone management, analysis overlays, and parts list generation.">
+  <meta property="og:title" content="Sprinkler Layout Tool">
+  <meta property="og:description" content="Plan irrigation sprinkler layouts with calibrated background images, zone management, analysis overlays, and parts list generation.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💧</text></svg>" type="image/svg+xml">
+  <title>Sprinkler Layout Tool</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-brand">
+        <p class="eyebrow">Local MVP</p>
+        <h1>Sprinkler Layout Tool</h1>
+      </div>
+      <div class="screen-switch" role="tablist" aria-label="App screens">
+        <button type="button" data-screen="layout" class="screen-switch-button is-active">Layout</button>
+        <button type="button" data-screen="parts" class="screen-switch-button">Parts</button>
+      </div>
+      <div class="topbar-tools">
+        <div class="tool-grid topbar-tool-grid">
+          <button type="button" data-tool="select" class="tool-button is-active">Select</button>
+          <button type="button" data-tool="place" class="tool-button">Place</button>
+          <button type="button" data-tool="pipe" class="tool-button">Pipe</button>
+          <button type="button" data-tool="wire" class="tool-button">Wire</button>
+          <button type="button" data-tool="fittings" class="tool-button">Fittings</button>
+          <button type="button" data-tool="valve-box" class="tool-button">Valve Box</button>
+          <button type="button" data-tool="controller" class="tool-button">Controller</button>
+          <button type="button" data-tool="calibrate" class="tool-button">Calibrate</button>
+          <button type="button" data-tool="measure" class="tool-button">Measure</button>
+          <button type="button" data-tool="pan" class="tool-button">Pan</button>
+        </div>
+        <label class="field field-compact topbar-pattern">
+          <span>Placement pattern</span>
+          <select id="placement-pattern">
+            <option value="full">Full circle</option>
+            <option value="arc">Arc</option>
+            <option value="strip">Strip</option>
+          </select>
+        </label>
+        <label class="field field-compact topbar-pattern">
+          <span>Pipe type</span>
+          <select id="pipe-placement-kind">
+            <option value="main">Main supply</option>
+            <option value="zone" selected>Zone line</option>
+          </select>
+        </label>
+      </div>
+      <div class="status-strip topbar-status">
+        <span id="scale-status" class="status-pill status-pill-warning">Uncalibrated</span>
+        <span id="hydraulics-status" class="status-pill status-pill-warning">Hydraulics missing</span>
+        <span id="ready-status" class="status-pill">Draft</span>
+      </div>
+    </header>
+
+    <main id="layout-screen" class="workspace">
+      <aside class="toolbar-panel">
+        <section class="panel">
+          <h2>Project</h2>
+          <label class="field">
+            <span>Project name</span>
+            <input id="project-name" type="text" value="Sprinkler Layout">
+          </label>
+          <label class="field">
+            <span>Units (feet only)</span>
+            <select id="units-select">
+              <option value="ft">Feet</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Import yard image</span>
+            <input id="background-input" type="file" accept="image/png,image/jpeg">
+          </label>
+          <div class="button-row">
+            <button id="save-json-button" type="button">Save JSON</button>
+            <button id="load-json-button" type="button">Load JSON</button>
+          </div>
+          <div class="button-row">
+            <button id="export-png-button" type="button">Export PNG</button>
+            <button id="reset-view-button" type="button">Reset View</button>
+          </div>
+          <input id="project-json-input" type="file" accept="application/json" hidden>
+        </section>
+
+        <section class="panel">
+          <h2>Calibration</h2>
+          <p class="panel-copy">Click two points on the image, then enter the real-world distance between them.</p>
+          <label class="field">
+            <span>Measured distance</span>
+            <input id="calibration-distance" type="number" min="0.01" step="0.01" value="10">
+          </label>
+          <div class="button-row">
+            <button id="reset-calibration-points-button" type="button">Pick New Points</button>
+            <button id="apply-two-point-button" type="button">Apply Calibration</button>
+          </div>
+          <p class="panel-copy">Reapplying calibration keeps existing sprinkler footprints aligned to the drawing while measured lengths and analysis update to the new scale.</p>
+          <p id="calibration-points-label" class="muted-line">Calibration points: 0 selected</p>
+          <hr>
+          <p class="panel-copy">Advanced: rectify a photographed plan by marking the four corners of a known rectangle in any order before normal scale calibration.</p>
+          <div class="field-group">
+            <label class="field">
+              <span>Reference width</span>
+              <input id="rectification-reference-width" type="number" min="0.1" step="0.1" value="10">
+            </label>
+            <label class="field">
+              <span>Reference height</span>
+              <input id="rectification-reference-height" type="number" min="0.1" step="0.1" value="10">
+            </label>
+          </div>
+          <p class="panel-copy">Use any shared units here, such as grid squares or a known rectangle width and height.</p>
+          <div class="button-row">
+            <button id="pick-rectification-button" type="button">Pick 4 Corners</button>
+            <button id="clear-rectification-button" type="button">Clear Corners</button>
+            <button id="apply-rectification-button" type="button">Apply Rectification</button>
+          </div>
+          <p id="rectification-points-label" class="muted-line">Rectification corners: 0 selected</p>
+        </section>
+
+        <section class="panel">
+          <h2>Hydraulics</h2>
+          <label class="field">
+            <span>Supply line size</span>
+            <select id="line-size-select">
+              <option value="">Select line size</option>
+              <option value="0.5">1/2 in</option>
+              <option value="0.75">3/4 in</option>
+              <option value="1">1 in</option>
+              <option value="1.25">1 1/4 in</option>
+              <option value="1.5">1 1/2 in</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Pressure (psi)</span>
+            <input id="pressure-input" type="number" min="1" step="1" placeholder="e.g. 55">
+          </label>
+          <label class="field">
+            <span>Design flow cap (GPM)</span>
+            <input id="design-flow-limit-input" type="number" min="0.1" step="0.1" placeholder="Uses default cap">
+          </label>
+          <p class="muted-line">Used for zone over-limit warnings. Leave blank to use the default system cap.</p>
+          <p class="advisory">Hydraulic review is advisory only. This MVP does not calculate full pressure loss or zone sizing.</p>
+        </section>
+
+        <section class="panel">
+          <h2>View</h2>
+          <label class="checkbox-row">
+            <input id="toggle-coverage" type="checkbox" checked>
+            <span>Show coverage</span>
+          </label>
+          <label class="checkbox-row">
+            <input id="toggle-pipe" type="checkbox" checked>
+            <span>Show pipe</span>
+          </label>
+          <label class="checkbox-row">
+            <input id="toggle-trench" type="checkbox">
+            <span>Show trench</span>
+          </label>
+          <label class="checkbox-row">
+            <input id="toggle-wire" type="checkbox" checked>
+            <span>Show wire</span>
+          </label>
+          <label class="checkbox-row">
+            <input id="toggle-fittings" type="checkbox" checked>
+            <span>Show fittings</span>
+          </label>
+          <label class="checkbox-row">
+            <input id="toggle-grid" type="checkbox">
+            <span>Show grid</span>
+          </label>
+          <label class="checkbox-row">
+            <input id="toggle-labels" type="checkbox" checked>
+            <span>Show labels</span>
+          </label>
+          <label class="checkbox-row">
+            <input id="toggle-nozzle-labels" type="checkbox">
+            <span>Show nozzle labels</span>
+          </label>
+          <label class="checkbox-row">
+            <input id="toggle-zone-labels" type="checkbox" checked>
+            <span>Show zone labels</span>
+          </label>
+          <label class="field">
+            <span>Coverage opacity</span>
+            <input id="coverage-opacity" type="range" min="0.05" max="0.5" step="0.01" value="0.22">
+          </label>
+          <div class="legend">
+            <div><span class="legend-swatch legend-zero"></span>No coverage</div>
+            <div><span class="legend-swatch legend-one"></span>1 overlap</div>
+            <div><span class="legend-swatch legend-two"></span>2 overlaps</div>
+            <div><span class="legend-swatch legend-three"></span>3+ overlaps</div>
+          </div>
+          <p class="muted-line">Coverage view still helps inspect overlap geometry while analysis overlays handle application rate, runtime, and schedule depth.</p>
+        </section>
+
+        <section class="panel">
+          <h2>Analysis</h2>
+          <label class="field">
+            <span>Overlay</span>
+            <select id="analysis-overlay-mode">
+              <option value="none">None</option>
+              <option value="application_rate" selected>Application rate</option>
+              <option value="zone_catch_can">Zone catch-can</option>
+              <option value="full_schedule_depth">Full schedule depth</option>
+              <option value="target_error">Target error</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Target depth (in)</span>
+            <input id="analysis-target-depth" type="number" min="0.1" step="0.05" value="1.0">
+          </label>
+          <label class="field">
+            <span>Catch-can zone</span>
+            <select id="analysis-zone-select">
+              <option value="">Select zone</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Grid detail</span>
+            <select id="analysis-cell-px">
+              <option value="12">Fine</option>
+              <option value="18" selected>Balanced</option>
+              <option value="28">Fast</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Rate scale</span>
+            <select id="analysis-rate-scale-mode">
+              <option value="zone" selected>Auto per zone</option>
+              <option value="project">Auto full plan</option>
+              <option value="fixed">Fixed absolute</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Rate max in/hr</span>
+            <input id="analysis-rate-scale-max" type="number" min="0.1" step="0.1" value="3.0">
+          </label>
+          <div id="analysis-legend" class="legend"></div>
+          <p id="analysis-summary" class="muted-line">Analysis overlays estimate application rate, runtime depth, and schedule balance from the recommended heads and nozzles.</p>
+        </section>
+
+        <section class="panel">
+          <h2>History</h2>
+          <div class="button-row">
+            <button id="undo-button" type="button">Undo</button>
+            <button id="redo-button" type="button">Redo</button>
+          </div>
+          <p id="history-summary" class="muted-line">0 undo / 0 redo</p>
+        </section>
+      </aside>
+
+      <section class="canvas-panel">
+        <div class="canvas-toolbar">
+          <span id="cursor-position">Cursor: --</span>
+          <span id="measure-readout">Measure: --</span>
+          <span id="analysis-readout">Analysis: --</span>
+          <span id="hint-text">Hint: import an image, calibrate scale, then place sprinklers.</span>
+        </div>
+        <div class="canvas-frame">
+          <canvas id="sprinkler-canvas" width="1600" height="1000"></canvas>
+          <section id="fittings-panel" class="floating-panel fittings-panel" hidden aria-label="Fittings palette">
+            <header id="fittings-panel-handle" class="floating-panel-handle">
+              <div class="floating-panel-copy">
+                <h3>Fittings</h3>
+                <p>Choose a zone context, then drag this palette where you need it.</p>
+              </div>
+            </header>
+            <div class="floating-panel-body">
+              <label class="field field-compact">
+                <span>Associate to</span>
+                <select id="fittings-zone-select">
+                  <option value="auto">Auto</option>
+                  <option value="main">Main</option>
+                </select>
+              </label>
+              <div id="fittings-tab-list" class="segmented-tabs" role="tablist" aria-label="Fittings catalog">
+                <button type="button" class="segmented-tab" data-fittings-tab="suggested" role="tab" aria-selected="true">Suggested</button>
+                <button type="button" class="segmented-tab" data-fittings-tab="common" role="tab" aria-selected="false">Common</button>
+                <button type="button" class="segmented-tab" data-fittings-tab="all" role="tab" aria-selected="false">All</button>
+                <button type="button" class="segmented-tab" data-fittings-tab="ignored" role="tab" aria-selected="false">Ignored</button>
+              </div>
+              <div id="fittings-panel-content" class="fittings-panel-content"></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="details-panel">
+        <section class="panel">
+          <h2 id="selection-title">Selected Item</h2>
+          <div id="selection-empty" class="empty-card">Select a sprinkler, valve box, controller, pipe run, wire run, or fitting to edit its properties.</div>
+          <div id="selection-form" hidden>
+            <label class="field">
+              <span>Coverage</span>
+              <select id="sprinkler-coverage-model">
+                <option value="full">Full circle</option>
+                <option value="arc">Arc</option>
+                <option value="strip">Strip</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Label</span>
+              <input id="sprinkler-label" type="text">
+            </label>
+            <div class="field-group">
+              <label class="field">
+                <span>X</span>
+                <input id="sprinkler-x" type="number" step="0.01">
+              </label>
+              <label class="field">
+                <span>Y</span>
+                <input id="sprinkler-y" type="number" step="0.01">
+              </label>
+            </div>
+            <div id="sector-radius-pattern" class="field-group">
+              <label class="field">
+                <span>Radius</span>
+                <input id="sprinkler-radius" type="number" min="0.1" step="0.1">
+              </label>
+              <label class="field">
+                <span>Pattern</span>
+                <select id="sprinkler-pattern">
+                  <option value="full">Full</option>
+                  <option value="arc">Arc</option>
+                </select>
+              </label>
+            </div>
+            <div id="sector-angle-fields" class="field-group">
+              <label class="field">
+                <span>Start deg</span>
+                <input id="sprinkler-start" type="number" min="0" max="359" step="1">
+              </label>
+              <label class="field">
+                <span>Sweep deg</span>
+                <input id="sprinkler-sweep" type="number" min="1" max="360" step="1">
+              </label>
+            </div>
+            <div id="strip-fields" hidden>
+              <div class="field-group">
+                <label class="field">
+                  <span>Strip type</span>
+                  <select id="sprinkler-strip-mode">
+                    <option value="end">End strip</option>
+                    <option value="side">Side strip</option>
+                    <option value="center">Center strip</option>
+                    <option value="corner">Corner strip</option>
+                  </select>
+                </label>
+                <label class="field" id="sprinkler-strip-mirror-field">
+                  <span>Corner side</span>
+                  <select id="sprinkler-strip-mirror">
+                    <option value="right">Right</option>
+                    <option value="left">Left</option>
+                  </select>
+                </label>
+              </div>
+              <div class="field-group">
+                <label class="field">
+                  <span>Length</span>
+                  <input id="sprinkler-strip-length" type="number" min="0.1" step="0.1">
+                </label>
+                <label class="field">
+                  <span>Width</span>
+                  <input id="sprinkler-strip-width" type="number" min="0.1" step="0.1">
+                </label>
+              </div>
+              <label class="field">
+                <span>Rotation deg</span>
+                <input id="sprinkler-strip-rotation" type="number" min="0" max="359" step="1">
+              </label>
+            </div>
+            <label class="field">
+              <span>Zone</span>
+              <div id="sprinkler-zone-picker" class="zone-picker">
+                <button
+                  id="sprinkler-zone-button"
+                  class="zone-picker-button"
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                >
+                  <span class="zone-picker-value">
+                    <span id="sprinkler-zone-dot" class="zone-swatch zone-swatch-neutral"></span>
+                    <span id="sprinkler-zone-label">Unassigned</span>
+                  </span>
+                </button>
+                <div id="sprinkler-zone-menu" class="zone-picker-menu" role="listbox" hidden></div>
+                <input id="sprinkler-zone" type="hidden" value="">
+              </div>
+            </label>
+            <label class="checkbox-row">
+              <input id="sprinkler-hidden" type="checkbox">
+              <span>Hide coverage</span>
+            </label>
+            <div id="sprinkler-analysis" hidden></div>
+            <div class="button-row">
+              <button id="duplicate-sprinkler-button" type="button">Duplicate</button>
+              <button id="delete-sprinkler-button" type="button" class="danger-button">Delete</button>
+            </div>
+          </div>
+          <div id="valve-box-form" hidden>
+            <label class="field">
+              <span>Label</span>
+              <input id="valve-box-label" type="text">
+            </label>
+            <div class="field-group">
+              <label class="field">
+                <span>X</span>
+                <input id="valve-box-x" type="number" step="0.01">
+              </label>
+              <label class="field">
+                <span>Y</span>
+                <input id="valve-box-y" type="number" step="0.01">
+              </label>
+            </div>
+            <label class="field">
+              <span>Assigned zones</span>
+              <div id="valve-box-zones" class="valve-box-zone-list"></div>
+            </label>
+            <div class="button-row">
+              <button id="delete-valve-box-button" type="button" class="danger-button">Delete</button>
+            </div>
+          </div>
+          <div id="controller-form" hidden>
+            <label class="field">
+              <span>Label</span>
+              <input id="controller-label" type="text">
+            </label>
+            <div class="field-group">
+              <label class="field">
+                <span>X</span>
+                <input id="controller-x" type="number" step="0.01">
+              </label>
+              <label class="field">
+                <span>Y</span>
+                <input id="controller-y" type="number" step="0.01">
+              </label>
+            </div>
+            <label class="field">
+              <span>Station capacity</span>
+              <input id="controller-station-capacity" type="number" min="1" step="1" value="8">
+            </label>
+            <label class="field">
+              <span>Connected valve boxes</span>
+              <textarea id="controller-connected-boxes" rows="3" readonly></textarea>
+            </label>
+            <div class="button-row">
+              <button id="delete-controller-button" type="button" class="danger-button">Delete</button>
+            </div>
+          </div>
+          <div id="pipe-run-form" hidden>
+            <label class="field">
+              <span>Label</span>
+              <input id="pipe-label" type="text">
+            </label>
+            <div class="field-group">
+              <label class="field">
+                <span>Pipe type</span>
+                <select id="pipe-kind">
+                  <option value="main">Main supply</option>
+                  <option value="zone" selected>Zone line</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Diameter</span>
+                <select id="pipe-diameter">
+                  <option value="">Unspecified</option>
+                  <option value="0.5">0.5 in</option>
+                  <option value="0.75">0.75 in</option>
+                  <option value="1">1 in</option>
+                  <option value="1.25">1.25 in</option>
+                  <option value="1.5">1.5 in</option>
+                </select>
+              </label>
+            </div>
+            <label id="pipe-zone-field" class="field">
+              <span>Zone</span>
+              <select id="pipe-zone">
+                <option value="">Unassigned</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Length</span>
+              <input id="pipe-length" type="text" readonly>
+            </label>
+            <div class="button-row">
+              <button id="delete-pipe-button" type="button" class="danger-button">Delete</button>
+            </div>
+          </div>
+          <div id="wire-run-form" hidden>
+            <label class="field">
+              <span>Label</span>
+              <input id="wire-label" type="text">
+            </label>
+            <div class="field-group">
+              <label class="field">
+                <span>Conductors</span>
+                <input id="wire-conductor-count" type="number" min="1" step="1" value="2">
+              </label>
+              <label class="field">
+                <span>Gauge</span>
+                <select id="wire-gauge">
+                  <option value="18" selected>18 AWG</option>
+                  <option value="16">16 AWG</option>
+                  <option value="14">14 AWG</option>
+                </select>
+              </label>
+            </div>
+            <label class="field">
+              <span>Controller</span>
+              <select id="wire-controller">
+                <option value="">Unassigned</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Valve box</span>
+              <select id="wire-valve-box">
+                <option value="">Unassigned</option>
+              </select>
+            </label>
+            <div id="wire-requirement" class="selection-note"></div>
+            <label class="field">
+              <span>Color / notes</span>
+              <input id="wire-color" type="text" placeholder="e.g. white jacket, red stripe">
+            </label>
+            <label class="field">
+              <span>Length</span>
+              <input id="wire-length" type="text" readonly>
+            </label>
+            <div class="button-row">
+              <button id="delete-wire-button" type="button" class="danger-button">Delete</button>
+            </div>
+          </div>
+          <div id="fitting-form" hidden>
+            <label class="field">
+              <span>Type</span>
+              <input id="fitting-type" type="text" readonly>
+            </label>
+            <label class="field">
+              <span>Zone</span>
+              <input id="fitting-zone" type="text" readonly>
+            </label>
+            <label class="field">
+              <span>Size</span>
+              <input id="fitting-size" type="text" readonly>
+            </label>
+            <label class="field">
+              <span>Anchor</span>
+              <input id="fitting-anchor" type="text" readonly>
+            </label>
+            <div class="button-row">
+              <button id="delete-fitting-button" type="button" class="danger-button">Delete</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Zones</h2>
+          <div class="field-group">
+            <label class="field">
+              <span>Zone view</span>
+              <select id="zone-view-mode">
+                <option value="coverage">Coverage view</option>
+                <option value="zone">Zone view</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Active zone</span>
+              <select id="active-zone-select">
+                <option value="">Unassigned</option>
+              </select>
+            </label>
+          </div>
+          <div class="button-row">
+            <button id="create-zone-button" type="button">Create Zone</button>
+            <button id="clear-zone-focus-button" type="button">Show All</button>
+          </div>
+          <div id="zones-list" class="zone-list"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Project Summary</h2>
+          <dl id="project-summary" class="summary-list"></dl>
+        </section>
+      </aside>
+    </main>
+
+    <section id="parts-screen" class="parts-screen" hidden>
+      <aside class="parts-sidebar">
+        <section class="panel">
+          <h2>Parts Scope</h2>
+          <div class="button-row">
+            <button id="parts-include-all" type="button">Include All</button>
+            <button id="parts-exclude-all" type="button">Exclude All</button>
+          </div>
+          <div id="parts-zone-filters" class="parts-zone-filters"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Grouping</h2>
+          <label class="field">
+            <span>Group by</span>
+            <select id="parts-group-by">
+              <option value="body_nozzle_split" selected>Body / nozzle split</option>
+              <option value="exact_sku">Exact SKU</option>
+              <option value="sku_family">SKU family</option>
+            </select>
+          </label>
+          <label class="checkbox-row">
+            <input id="parts-show-zone-usage" type="checkbox" checked>
+            <span>Show zone usage</span>
+          </label>
+          <p id="parts-summary" class="muted-line">Parts list will populate from the current recommendations.</p>
+        </section>
+      </aside>
+
+      <section class="parts-main panel">
+        <div class="parts-header">
+          <div>
+            <h2>Parts List</h2>
+            <p id="parts-empty" class="muted-line">No included recommended heads yet.</p>
+          </div>
+        </div>
+        <div id="parts-table" class="parts-table-wrap"></div>
+      </section>
+    </section>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
