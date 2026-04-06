@@ -6,6 +6,7 @@ import {
   findSelectedPipeRun,
   findSelectedSprinkler,
   findSelectedValveBox,
+  findSelectedWateringArea,
   findSelectedWireRun,
 } from "../state/project-state.js";
 import { createRenderer } from "../canvas/renderer.js";
@@ -98,6 +99,7 @@ document.addEventListener("keydown", (event) => {
     const state = store.getState();
     const selectedPipeRun = findSelectedPipeRun(state);
     const selectedWireRun = findSelectedWireRun(state);
+    const selectedWateringArea = findSelectedWateringArea(state);
     if (selectedPipeRun && Number.isInteger(state.ui.selectedPipeVertexIndex)) {
       event.preventDefault();
       store.dispatch({
@@ -114,6 +116,14 @@ document.addEventListener("keydown", (event) => {
       });
       return;
     }
+    if (selectedWateringArea && Number.isInteger(state.ui.selectedWateringAreaVertexIndex)) {
+      event.preventDefault();
+      store.dispatch({
+        type: "DELETE_WATERING_AREA_VERTEX",
+        payload: { id: selectedWateringArea.id, index: state.ui.selectedWateringAreaVertexIndex },
+      });
+      return;
+    }
     if (selectedPipeRun) {
       event.preventDefault();
       store.dispatch({ type: "DELETE_PIPE_RUN", payload: { id: selectedPipeRun.id } });
@@ -127,6 +137,11 @@ document.addEventListener("keydown", (event) => {
     if (state.ui.selectedSprinklerId) {
       event.preventDefault();
       store.dispatch({ type: "DELETE_SPRINKLER", payload: { id: state.ui.selectedSprinklerId } });
+      return;
+    }
+    if (selectedWateringArea) {
+      event.preventDefault();
+      store.dispatch({ type: "DELETE_WATERING_AREA", payload: { id: selectedWateringArea.id } });
       return;
     }
     if (state.ui.selectedValveBoxId) {
@@ -163,6 +178,11 @@ document.addEventListener("keydown", (event) => {
       interactions.cancelWireDraft();
       return;
     }
+    if (state.ui.activeTool === "area" && state.ui.wateringAreaDraft) {
+      event.preventDefault();
+      interactions.cancelWateringAreaDraft();
+      return;
+    }
     if (state.ui.activeTool === "calibrate" && state.ui.calibrationMode === "rectify" && state.ui.rectificationPoints.length) {
       event.preventDefault();
       store.dispatch({ type: "CLEAR_RECTIFICATION_POINTS" });
@@ -190,6 +210,11 @@ document.addEventListener("keydown", (event) => {
     if (state.ui.activeTool === "wire" && state.ui.wireDraft?.points?.length >= 2) {
       event.preventDefault();
       interactions.finishWireDraft();
+      return;
+    }
+    if (state.ui.activeTool === "area" && state.ui.wateringAreaDraft?.points?.length >= 3) {
+      event.preventDefault();
+      interactions.finishWateringAreaDraft();
     }
   }
 });

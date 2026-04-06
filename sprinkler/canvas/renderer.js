@@ -7,7 +7,8 @@ import { normalizeRectificationCorners } from "../geometry/rectification.js";
 import { buildStripFootprintWorldPoints, buildStripHandleWorldPoints, isStripCoverage } from "../geometry/coverage.js";
 import { toPixels, worldToScreen } from "../geometry/scale.js";
 import { buildDerivedTrenchSpans, buildTrenchCacheKey } from "../geometry/trenches.js";
-import { findSelectedController, findSelectedFitting, findSelectedPipeRun, findSelectedSprinkler, findSelectedValveBox, findSelectedWireRun, getZoneById, hasHydraulics, isProjectReady } from "../state/project-state.js";
+import { calculateWateringAreaCentroid, pointInWateringArea } from "../geometry/watering-areas.js";
+import { findSelectedController, findSelectedFitting, findSelectedPipeRun, findSelectedSprinkler, findSelectedValveBox, findSelectedWateringArea, findSelectedWireRun, getZoneById, hasHydraulics, isProjectReady } from "../state/project-state.js";
 
 const THEME = {
   bg: "#f6f1e4",
@@ -94,6 +95,7 @@ export function createRenderer(canvas, store, analyzer) {
     if (state.view.showCoverage) {
       drawCoverage(state, analysis);
     }
+    drawWateringAreas(state);
     if (state.view.showTrench === true) {
       drawTrenchRuns(state);
     }
@@ -110,6 +112,7 @@ export function createRenderer(canvas, store, analyzer) {
     drawHoveredFittingPreview(state);
     drawPipeDraft(state);
     drawWireDraft(state);
+    drawWateringAreaDraft(state);
     drawFittingDraft(state);
     drawSelectedHandles(state);
     drawOverlayWarnings(state);
@@ -363,6 +366,35 @@ export function createRenderer(canvas, store, analyzer) {
       ctx.fill();
       ctx.stroke();
     });
+    ctx.restore();
+  }
+
+  function drawWateringAreas(state) {
+    const selectedWateringArea = findSelectedWateringArea(state);
+    ctx.save();
+
+    state.wateringAreas.forEach((wateringArea) => {
+      if (!wateringArea.points?.length || wateringArea.points.length < 3) {
+        return;
+      }
+
+      const isSelected = selectedWateringArea?.id === wateringArea.id;
+      const centroid = calculateWateringAreaCentroid(wateringArea.points);
+      drawWateringAreaPath(wateringArea.points, state);
+      ctx.fillStyle = isSelected ? "rgba(70, 132, 88, 0.12)" : "rgba(70, 132, 88, 0.07)";
+      ctx.strokeStyle = isSelected ? "rgba(36, 90, 52, 0.96)" : "rgba(56, 115, 71, 0.72)";
+      ctx.lineWidth = isSelected ? 2.4 : 1.4;
+      ctx.fill();
+      ctx.stroke();
+
+      if (state.view.showLabels) {
+        const centroidScreen = worldToScreen(centroid, state.view);
+        ctx.fillStyle = isSelected ? "rgba(36, 90, 52, 0.98)" : "rgba(56, 115, 71, 0.92)";
+        ctx.font = CANVAS_FONT(12);
+        ctx.fillText(wateringArea.label || wateringArea.id, centroidScreen.x + 8, centroidScreen.y - 8);
+      }
+    });
+
     ctx.restore();
   }
 
@@ -855,6 +887,12 @@ export function createRenderer(canvas, store, analyzer) {
       return;
     }
 
+    const selectedWateringArea = findSelectedWateringArea(state);
+    if (selectedWateringArea) {
+      drawSelectedWateringAreaOutline(state, selectedWateringArea);
+      return;
+    }
+
     const selected = findSelectedSprinkler(state);
     if (!selected || !state.scale.pixelsPerUnit) {
       return;
@@ -956,6 +994,103 @@ export function createRenderer(canvas, store, analyzer) {
     drawHandle(handles.primary, "#d55d3f");
     drawHandle(handles.secondary, "#4f5bff");
     ctx.restore();
+  }
+
+  function drawSelectedWateringAreaOutline(state, selectedWateringArea) {
+    if (!selectedWateringArea.points?.length || selectedWateringArea.points.length < 3) {
+      return;
+    }
+
+    const selectedVertexIndex = Number.isInteger(state.ui.selectedWateringAreaVertexIndex)
+      ? state.ui.selectedWateringAreaVertexIndex
+      : null;
+    const midpoints = buildWateringAreaMidpoints(selectedWateringArea.points);
+
+    ctx.save();
+    drawWateringAreaPath(selectedWateringArea.points, state);
+    ctx.strokeStyle = "rgba(27, 76, 44, 0.98)";
+    ctx.lineWidth = 2.8;
+    ctx.setLineDash([10, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    midpoints.forEach((midpointEntry) => {
+      const screenPoint = worldToScreen(midpointEntry.point, state.view);
+      drawPipeHandle(ctx, screenPoint, "#f2fbf4", "rgba(36, 90, 52, 0.96)", 4.5);
+    });
+    selectedWateringArea.points.forEach((point, index) => {
+      const screenPoint = worldToScreen(point, state.view);
+      drawPipeHandle(
+        ctx,
+        screenPoint,
+        selectedVertexIndex === index ? "rgba(36, 90, 52, 0.96)" : "#fff7eb",
+        selectedVertexIndex === index ? "#ffffff" : "rgba(36, 90, 52, 0.96)",
+        5.8,
+      );
+    });
+    ctx.restore();
+  }
+
+  function drawWateringAreaDraft(state) {
+    if (!state.ui.wateringAreaDraft?.points?.length) {
+      return;
+    }
+
+    const draftPoints = state.ui.wateringAreaDraft.previewPoint
+      ? [...state.ui.wateringAreaDraft.points, state.ui.wateringAreaDraft.previewPoint]
+      : [...state.ui.wateringAreaDraft.points];
+    if (!draftPoints.length) {
+      return;
+    }
+
+    ctx.save();
+    if (draftPoints.length >= 3) {
+      drawWateringAreaPath(draftPoints, state);
+      ctx.fillStyle = "rgba(70, 132, 88, 0.08)";
+      ctx.fill();
+    }
+    ctx.beginPath();
+    const first = worldToScreen(draftPoints[0], state.view);
+    ctx.moveTo(first.x, first.y);
+    draftPoints.slice(1).forEach((point) => {
+      const screenPoint = worldToScreen(point, state.view);
+      ctx.lineTo(screenPoint.x, screenPoint.y);
+    });
+    if (draftPoints.length >= 3) {
+      ctx.closePath();
+    }
+    ctx.strokeStyle = "rgba(36, 90, 52, 0.94)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    draftPoints.forEach((point, index) => {
+      const screenPoint = worldToScreen(point, state.view);
+      drawPipeHandle(
+        ctx,
+        screenPoint,
+        index === draftPoints.length - 1 ? "#fff7eb" : "#ffffff",
+        "rgba(36, 90, 52, 0.94)",
+        4.8,
+      );
+    });
+    ctx.restore();
+  }
+
+  function drawWateringAreaPath(points, state) {
+    const safePoints = points ?? [];
+    if (!safePoints.length) {
+      return;
+    }
+
+    ctx.beginPath();
+    const first = worldToScreen(safePoints[0], state.view);
+    ctx.moveTo(first.x, first.y);
+    safePoints.slice(1).forEach((point) => {
+      const screenPoint = worldToScreen(point, state.view);
+      ctx.lineTo(screenPoint.x, screenPoint.y);
+    });
+    ctx.closePath();
   }
 
   function drawSprinklerShape(state, sprinkler) {
@@ -1213,11 +1348,67 @@ export function createRenderer(canvas, store, analyzer) {
       .find((entry) => entry.distance <= 81) || null;
   }
 
+  function getWateringAreaVertexHandleHit(worldPoint) {
+    const state = store.getState();
+    const selectedWateringArea = findSelectedWateringArea(state);
+    if (!selectedWateringArea) {
+      return null;
+    }
+
+    const screenPoint = worldToScreen(worldPoint, state.view);
+    return selectedWateringArea.points
+      .map((point, index) => ({
+        id: selectedWateringArea.id,
+        index,
+        point,
+        distance: distanceSquared(screenPoint, worldToScreen(point, state.view)),
+      }))
+      .find((entry) => entry.distance <= 100) || null;
+  }
+
+  function getWateringAreaMidpointHandleHit(worldPoint) {
+    const state = store.getState();
+    const selectedWateringArea = findSelectedWateringArea(state);
+    if (!selectedWateringArea) {
+      return null;
+    }
+
+    const screenPoint = worldToScreen(worldPoint, state.view);
+    return buildWateringAreaMidpoints(selectedWateringArea.points)
+      .map((entry) => ({
+        id: selectedWateringArea.id,
+        index: entry.index,
+        point: entry.point,
+        distance: distanceSquared(screenPoint, worldToScreen(entry.point, state.view)),
+      }))
+      .find((entry) => entry.distance <= 81) || null;
+  }
+
   function getHitSprinkler(worldPoint) {
     const state = store.getState();
     return [...state.sprinklers].reverse().find((sprinkler) => {
       const hitRadius = Math.max(8 / state.view.zoom, 4 / Math.max(state.scale.pixelsPerUnit || 1, 1));
       return pointInSprinkler(worldPoint, { ...sprinkler, pattern: "full", sweepDeg: 360, radius: hitRadius });
+    }) || null;
+  }
+
+  function getHitWateringArea(worldPoint) {
+    const state = store.getState();
+    const screenPoint = worldToScreen(worldPoint, state.view);
+    return [...state.wateringAreas].reverse().find((wateringArea) => {
+      if (!wateringArea.points?.length || wateringArea.points.length < 3) {
+        return false;
+      }
+
+      if (pointInWateringArea(worldPoint, wateringArea.points)) {
+        return true;
+      }
+
+      return wateringArea.points.some((point, index) => {
+        const start = worldToScreen(point, state.view);
+        const end = worldToScreen(wateringArea.points[(index + 1) % wateringArea.points.length], state.view);
+        return distancePointToSegmentSquared(screenPoint, start, end) <= 64;
+      });
     }) || null;
   }
 
@@ -1315,6 +1506,7 @@ export function createRenderer(canvas, store, analyzer) {
       : 0;
     return {
       sprinklerCount: state.sprinklers.length,
+      wateringAreaCount: state.wateringAreas.length,
       valveBoxCount: state.valveBoxes.length,
       controllerCount: state.controllers.length,
       pipeRunCount: state.pipeRuns.length,
@@ -1353,7 +1545,10 @@ export function createRenderer(canvas, store, analyzer) {
     getPipeMidpointHandleHit,
     getWireVertexHandleHit,
     getWireMidpointHandleHit,
+    getWateringAreaVertexHandleHit,
+    getWateringAreaMidpointHandleHit,
     getHitSprinkler,
+    getHitWateringArea,
     getHitValveBox,
     getHitController,
     getHitFitting,
@@ -1394,6 +1589,24 @@ function buildStripHandlePositions(state, sprinkler) {
     primaryWorld: worldHandles.primaryWorld,
     secondaryWorld: worldHandles.secondaryWorld,
   };
+}
+
+function buildWateringAreaMidpoints(points) {
+  const safePoints = points ?? [];
+  if (safePoints.length < 2) {
+    return [];
+  }
+
+  return safePoints.map((point, index) => {
+    const nextPoint = safePoints[(index + 1) % safePoints.length];
+    return {
+      index,
+      point: {
+        x: (point.x + nextPoint.x) / 2,
+        y: (point.y + nextPoint.y) / 2,
+      },
+    };
+  });
 }
 
 function drawPipePath(ctx, points, view) {
