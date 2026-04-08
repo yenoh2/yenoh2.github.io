@@ -13,6 +13,10 @@ const BODY_3504 = "Rain Bird 3504";
 const DEFAULT_ASSUMPTIONS = {
   sprayArcNormalizeToleranceDeg: 10,
   rotorSimplicityPrecipToleranceInHr: 0.01,
+  rotorUniformityTolerance: 0.0005,
+  rotorOptimizationCellPx: 18,
+  rotorUniformityDryWeight: 4,
+  rotorUniformityWetWeight: 1,
   zoneFamilyAutoResolvePrecipToleranceInHr: 0.03,
   universalMaxRadiusReductionPct: 0.25,
   maxExactRotorSearchStates: 250000,
@@ -56,6 +60,7 @@ function buildEmptySnapshot(designFlowLimitGpm, targetDepthInches = 1) {
   return {
     designFlowLimitGpm,
     targetDepthInches,
+    nozzleSelectionMode: "optimized",
     recommendations: [],
     recommendationsById: {},
     compatibilityById: {},
@@ -102,6 +107,10 @@ function buildEmptySnapshot(designFlowLimitGpm, targetDepthInches = 1) {
   };
 }
 
+function normalizeNozzleSelectionMode(value) {
+  return value === "conventional" ? "conventional" : "optimized";
+}
+
 function buildCacheKey(state) {
   return JSON.stringify({
     scale: {
@@ -117,6 +126,7 @@ function buildCacheKey(state) {
     },
     analysis: {
       targetDepthInches: state.analysis?.targetDepthInches,
+      nozzleSelectionMode: state.analysis?.nozzleSelectionMode,
     },
     parts: {
       groupBy: state.parts?.groupBy,
@@ -207,8 +217,11 @@ function analyzeProject(state, context) {
   const designFlowLimitGpm = Number.isFinite(Number(state.hydraulics?.designFlowLimitGpm)) && Number(state.hydraulics.designFlowLimitGpm) > 0
     ? Number(state.hydraulics.designFlowLimitGpm)
     : context.assumptions.designFlowLimitGpm;
+  const optimizerPixelsPerUnit = Number(state.scale?.pixelsPerUnit);
   const analysisContext = {
     ...context,
+    optimizerPixelsPerUnit: optimizerPixelsPerUnit > 0 ? optimizerPixelsPerUnit : 0,
+    nozzleSelectionMode: normalizeNozzleSelectionMode(state.analysis?.nozzleSelectionMode),
     assumptions: {
       ...context.assumptions,
       designFlowLimitGpm,
@@ -301,6 +314,7 @@ function analyzeProject(state, context) {
   return {
     designFlowLimitGpm: analysisContext.assumptions.designFlowLimitGpm,
     targetDepthInches,
+    nozzleSelectionMode: analysisContext.nozzleSelectionMode,
     recommendations,
     recommendationsById,
     compatibilityById,
@@ -432,15 +446,37 @@ function analyzeZone(zone, sprinklers, zonesById, context) {
 
   const baselineMetrics = scoreZoneRecommendations(baselineRecommendations, context.assumptions);
   const baselinePreferredFamily = determinePreferredZoneFamily(baselineMetrics.familyCounts);
-  const familyResolution = baselinePreferredFamily !== "mixed"
-    ? tryAutoResolveZoneFamily(
-      baselinePreferredFamily,
-      baselineRecommendations,
-      sprinklers,
-      zone,
-      zonesById,
-      context,
-    )
+  const mixedRotorResolution =
+    baselineMetrics.familyCounts.spray > 0 && baselineMetrics.familyCounts.rotor > 0
+      ? tryAutoResolveMixedZoneToRotor(
+        baselineRecommendations,
+        sprinklers,
+        zone,
+        zonesById,
+        context,
+      )
+      : null;
+  const familyResolution = mixedRotorResolution?.applied
+    ? mixedRotorResolution
+    : context.nozzleSelectionMode === "optimized"
+      ? (
+        baselinePreferredFamily !== "mixed"
+          ? tryAutoResolveZoneFamily(
+            baselinePreferredFamily,
+            baselineRecommendations,
+            sprinklers,
+            zone,
+            zonesById,
+            context,
+          )
+          : tryAutoResolveMixedZoneFamily(
+            baselineRecommendations,
+            sprinklers,
+            zone,
+            zonesById,
+            context,
+          )
+      )
     : null;
 
   const recommendations = familyResolution?.applied
@@ -596,14 +632,29 @@ function recommendRotorZone(rotors, zone, zonesById, context) {
     return { recommendations: candidateMatrix.flat(), notes };
   }
 
-  const optimized = optimizeRotorAssignments(candidateMatrix, context.assumptions);
+  if (context.nozzleSelectionMode === "conventional") {
+    const recommendations = candidateMatrix
+      .map((candidates, index) => pickConventionalRotorCandidate(rotors[index], candidates))
+      .filter(Boolean);
+    notes.push("Conventional rotor selector chose each head independently by nearest arc family and radius fit.");
+    return { recommendations, notes };
+  }
+
+  const optimizationContext = buildRotorOptimizationContext(rotors, context);
+  const optimized = optimizeRotorAssignments(candidateMatrix, context.assumptions, optimizationContext);
   if (optimized.searchMode === "beam") {
     notes.push("Rotor mix used beam search to keep the in-app optimizer responsive.");
   }
 
-  notes.push(
-    `Rotor zone target spread ${optimized.metrics.precipSpread.toFixed(3)} in/hr at ${optimized.metrics.totalFlowGpm.toFixed(2)} GPM using ${optimized.metrics.uniqueFamilies} family SKU${optimized.metrics.uniqueFamilies === 1 ? "" : "s"}.`,
-  );
+  if (Number.isFinite(optimized.metrics.uniformityScore)) {
+    notes.push(
+      `Rotor zone overlap score ${optimized.metrics.uniformityScore.toFixed(4)} (dry ${optimized.metrics.dryPenalty.toFixed(4)}, wet ${optimized.metrics.wetPenalty.toFixed(4)}, normalized spread ${optimized.metrics.normalizedRateSpread.toFixed(3)}) at ${optimized.metrics.totalFlowGpm.toFixed(2)} GPM using ${optimized.metrics.uniqueFamilies} family SKU${optimized.metrics.uniqueFamilies === 1 ? "" : "s"}. Head-level PR spread ${optimized.metrics.precipSpread.toFixed(3)} in/hr.`,
+    );
+  } else {
+    notes.push(
+      `Rotor zone target spread ${optimized.metrics.precipSpread.toFixed(3)} in/hr at ${optimized.metrics.totalFlowGpm.toFixed(2)} GPM using ${optimized.metrics.uniqueFamilies} family SKU${optimized.metrics.uniqueFamilies === 1 ? "" : "s"}.`,
+    );
+  }
 
   return { recommendations: optimized.recommendations, notes };
 }
@@ -660,6 +711,125 @@ function tryAutoResolveZoneFamily(preferredFamily, baselineRecommendations, spri
   };
 }
 
+function tryAutoResolveMixedZoneToRotor(baselineRecommendations, sprinklers, zone, zonesById, context) {
+  const baselineMetrics = scoreZoneRecommendations(baselineRecommendations, context.assumptions);
+  if ((baselineMetrics.familyCounts?.spray ?? 0) === 0 || (baselineMetrics.familyCounts?.rotor ?? 0) === 0) {
+    return { applied: false, recommendations: baselineRecommendations, notes: [] };
+  }
+
+  const uniformRotorZone = buildUniformZoneRecommendations("rotor", sprinklers, zone, zonesById, context);
+  if (!uniformRotorZone) {
+    return { applied: false, recommendations: baselineRecommendations, notes: [] };
+  }
+
+  const rotorMetrics = scoreZoneRecommendations(uniformRotorZone.recommendations, context.assumptions);
+  const notes = [];
+  if (uniformRotorZone.searchMode === "beam") {
+    notes.push("Mixed-zone rotor auto-resolution used beam search to keep the in-app optimizer responsive.");
+  }
+  if (context.nozzleSelectionMode === "conventional") {
+    notes.push("Conventional rotor selector chose each head independently by nearest arc family and radius fit.");
+  }
+  notes.push(
+    `Auto-resolved mixed zone to the rotor family because at least one head requires rotor coverage and every head can fit a rotor. Zone spread ${baselineMetrics.precipSpread.toFixed(3)} -> ${rotorMetrics.precipSpread.toFixed(3)} in/hr at ${baselineMetrics.totalFlowGpm.toFixed(2)} -> ${rotorMetrics.totalFlowGpm.toFixed(2)} GPM.`,
+  );
+
+  return {
+    applied: true,
+    recommendations: uniformRotorZone.recommendations.map((recommendation) => ({
+      ...recommendation,
+      comment: `${recommendation.comment} Auto-resolved to rotor because this zone contains a rotor-required head and every head can fit a rotor.`,
+    })),
+    notes,
+  };
+}
+
+function tryAutoResolveMixedZoneFamily(baselineRecommendations, sprinklers, zone, zonesById, context) {
+  const baselineMetrics = scoreZoneRecommendations(baselineRecommendations, context.assumptions);
+  const alternatives = ["spray", "rotor"]
+    .map((family) => {
+      const uniformZone = buildUniformZoneRecommendations(family, sprinklers, zone, zonesById, context);
+      if (!uniformZone) {
+        return null;
+      }
+
+      const metrics = scoreZoneRecommendations(uniformZone.recommendations, context.assumptions);
+      const withinFlowTolerance = metrics.flowOverageGpm <= baselineMetrics.flowOverageGpm;
+      const withinPrecipTolerance =
+        metrics.precipSpread <= baselineMetrics.precipSpread + context.assumptions.zoneFamilyAutoResolvePrecipToleranceInHr;
+
+      return {
+        family,
+        uniformZone,
+        metrics,
+        withinFlowTolerance,
+        withinPrecipTolerance,
+      };
+    })
+    .filter(Boolean);
+
+  if (!alternatives.length) {
+    return { applied: false, recommendations: baselineRecommendations, notes: [] };
+  }
+
+  const viableAlternatives = alternatives.filter((alternative) =>
+    alternative.withinFlowTolerance && alternative.withinPrecipTolerance,
+  );
+
+  if (!viableAlternatives.length) {
+    const bestAlternative = [...alternatives].sort(compareFamilyResolutionAlternatives)[0] ?? null;
+    if (!bestAlternative) {
+      return { applied: false, recommendations: baselineRecommendations, notes: [] };
+    }
+
+    const reasons = [];
+    if (!bestAlternative.withinFlowTolerance) {
+      reasons.push(`flow would rise from ${baselineMetrics.totalFlowGpm.toFixed(2)} to ${bestAlternative.metrics.totalFlowGpm.toFixed(2)} GPM`);
+    }
+    if (!bestAlternative.withinPrecipTolerance) {
+      reasons.push(`spread would rise from ${baselineMetrics.precipSpread.toFixed(3)} to ${bestAlternative.metrics.precipSpread.toFixed(3)} in/hr`);
+    }
+    return {
+      applied: false,
+      recommendations: baselineRecommendations,
+      notes: [
+        `A uniform-family alternative exists, but it was not auto-applied because ${reasons.join(" and ")}.`,
+      ],
+    };
+  }
+
+  const bestAlternative = [...viableAlternatives].sort(compareFamilyResolutionAlternatives)[0];
+  const notes = [];
+  if (bestAlternative.uniformZone.searchMode === "beam") {
+    notes.push("Mixed-zone family auto-resolution used beam search to keep the in-app optimizer responsive.");
+  }
+  notes.push(
+    `Auto-resolved mixed zone to the ${bestAlternative.family} family. Zone spread ${baselineMetrics.precipSpread.toFixed(3)} -> ${bestAlternative.metrics.precipSpread.toFixed(3)} in/hr at ${baselineMetrics.totalFlowGpm.toFixed(2)} -> ${bestAlternative.metrics.totalFlowGpm.toFixed(2)} GPM.`,
+  );
+
+  return {
+    applied: true,
+    recommendations: bestAlternative.uniformZone.recommendations.map((recommendation) => ({
+      ...recommendation,
+      comment: `${recommendation.comment} Auto-resolved to keep the zone on the ${bestAlternative.family} family.`,
+    })),
+    notes,
+  };
+}
+
+function compareFamilyResolutionAlternatives(a, b) {
+  if (a.metrics.flowOverageGpm !== b.metrics.flowOverageGpm) {
+    return a.metrics.flowOverageGpm - b.metrics.flowOverageGpm;
+  }
+  if (a.metrics.precipSpread !== b.metrics.precipSpread) {
+    return a.metrics.precipSpread - b.metrics.precipSpread;
+  }
+  if (a.metrics.totalFlowGpm !== b.metrics.totalFlowGpm) {
+    return a.metrics.totalFlowGpm - b.metrics.totalFlowGpm;
+  }
+  return a.family.localeCompare(b.family);
+}
+
 function buildUniformZoneRecommendations(preferredFamily, sprinklers, zone, zonesById, context) {
   const sortedSprinklers = [...sprinklers].sort(compareSprinklers);
   if (preferredFamily === "spray") {
@@ -677,7 +847,16 @@ function buildUniformZoneRecommendations(preferredFamily, sprinklers, zone, zone
     if (candidateMatrix.some((candidates) => candidates.length === 0)) {
       return null;
     }
-    const optimized = optimizeRotorAssignments(candidateMatrix, context.assumptions);
+    if (context.nozzleSelectionMode === "conventional") {
+      return {
+        recommendations: candidateMatrix
+          .map((candidates, index) => pickConventionalRotorCandidate(sortedSprinklers[index], candidates))
+          .filter(Boolean),
+        searchMode: "direct",
+      };
+    }
+    const optimizationContext = buildRotorOptimizationContext(sortedSprinklers, context);
+    const optimized = optimizeRotorAssignments(candidateMatrix, context.assumptions, optimizationContext);
     return {
       recommendations: optimized.recommendations,
       searchMode: optimized.searchMode,
@@ -687,15 +866,15 @@ function buildUniformZoneRecommendations(preferredFamily, sprinklers, zone, zone
   return null;
 }
 
-function optimizeRotorAssignments(candidateMatrix, assumptions) {
+function optimizeRotorAssignments(candidateMatrix, assumptions, optimizationContext = null) {
   const totalCombinations = candidateMatrix.reduce((product, candidates) => product * Math.max(candidates.length, 1), 1);
   if (totalCombinations <= assumptions.maxExactRotorSearchStates) {
-    return optimizeRotorAssignmentsExact(candidateMatrix, assumptions);
+    return optimizeRotorAssignmentsExact(candidateMatrix, assumptions, optimizationContext);
   }
-  return optimizeRotorAssignmentsBeam(candidateMatrix, assumptions);
+  return optimizeRotorAssignmentsBeam(candidateMatrix, assumptions, optimizationContext);
 }
 
-function optimizeRotorAssignmentsExact(candidateMatrix, assumptions) {
+function optimizeRotorAssignmentsExact(candidateMatrix, assumptions, optimizationContext = null) {
   let best = null;
 
   search(0, []);
@@ -704,7 +883,7 @@ function optimizeRotorAssignmentsExact(candidateMatrix, assumptions) {
 
   function search(index, picks) {
     if (index === candidateMatrix.length) {
-      const metrics = scoreRotorAssignment(picks, assumptions);
+      const metrics = scoreRotorAssignment(picks, assumptions, optimizationContext);
       const candidate = { recommendations: picks.map(cloneRecommendation), metrics };
       if (!best || compareRotorScores(candidate.metrics, best.metrics, assumptions) < 0) {
         best = candidate;
@@ -720,22 +899,22 @@ function optimizeRotorAssignmentsExact(candidateMatrix, assumptions) {
   }
 }
 
-function optimizeRotorAssignmentsBeam(candidateMatrix, assumptions) {
-  let beams = [{ picks: [], metrics: scoreRotorAssignment([], assumptions) }];
+function optimizeRotorAssignmentsBeam(candidateMatrix, assumptions, optimizationContext = null) {
+  let beams = [{ picks: [], metrics: scoreRotorAssignment([], assumptions, optimizationContext) }];
 
   for (const candidates of candidateMatrix) {
     const next = [];
     for (const beam of beams) {
       for (const candidate of candidates) {
         const picks = beam.picks.concat(candidate);
-        next.push({ picks, metrics: scoreRotorAssignment(picks, assumptions) });
+        next.push({ picks, metrics: scoreRotorAssignment(picks, assumptions, optimizationContext) });
       }
     }
     next.sort((a, b) => compareRotorScores(a.metrics, b.metrics, assumptions));
     beams = next.slice(0, assumptions.rotorBeamWidth);
   }
 
-  const best = beams[0] ?? { picks: [], metrics: scoreRotorAssignment([], assumptions) };
+  const best = beams[0] ?? { picks: [], metrics: scoreRotorAssignment([], assumptions, optimizationContext) };
   return {
     recommendations: best.picks.map(cloneRecommendation),
     metrics: best.metrics,
@@ -790,6 +969,7 @@ function buildRecommendationBase(sprinkler, zone, zonesById, details) {
       ? pctReduction(details.selectedRadiusFt, sprinkler.radius)
       : 0,
     desiredArcDeg: sprinkler.desiredArcDeg,
+    nominalArcDeg: Number.isFinite(Number(details.nominalArcDeg)) ? Number(details.nominalArcDeg) : null,
     selectedArcDeg: installedArcDeg,
     arcNormalized: Boolean(details.arcNormalized),
     desiredStripLengthFt: sprinkler.stripLength ?? null,
@@ -1015,7 +1195,7 @@ function buildRotorDatabase(rotorSeries) {
 function buildRotorCandidatesForHead(sprinkler, zone, zonesById, context) {
   const matchedCandidates = context.rotorData.matchedSets
     .filter((set) => radiusFits(set.radiusFt, sprinkler.radius, set.maxReduction, context.assumptions))
-    .flatMap((set) => set.variants.map((variant) => buildRecommendationBase(sprinkler, zone, zonesById, {
+    .flatMap((set) => prunePreBalancedVariants(set.variants, sprinkler.desiredArcDeg).map((variant) => buildRecommendationBase(sprinkler, zone, zonesById, {
       family: "rotor",
       body: BODY_5004_PRS,
       nozzle: `${set.label}_${variant.code}`,
@@ -1023,6 +1203,7 @@ function buildRotorCandidatesForHead(sprinkler, zone, zonesById, context) {
       skuFamily: set.label,
       radiusClassFt: set.radiusFt,
       selectedRadiusFt: set.radiusFt,
+      nominalArcDeg: variant.nominalArcDeg,
       flowGpm: variant.flowGpm,
       comment: `Pre-balanced ${set.label} ${variant.code} nozzle.`,
     })));
@@ -1106,6 +1287,7 @@ function buildZoneCompatibility(recommendation, sprinkler, zone, zoneReport, zon
   const rotorFit = describeRotorFit(sprinkler, assignedZone, zonesById, context);
   const preferredFamily = zoneReport?.preferredFamily ?? "mixed";
   const familyCounts = zoneReport?.familyCounts ?? { spray: 0, rotor: 0 };
+  const recommendationLabel = `${recommendation.body} ${recommendation.nozzleLabel || recommendation.nozzle}`;
 
   if (!assignedZone.id) {
     return {
@@ -1119,6 +1301,8 @@ function buildZoneCompatibility(recommendation, sprinkler, zone, zoneReport, zon
       ],
       preferredFitLabel: null,
       alternateFitLabel: null,
+      preferredFitTitle: null,
+      alternateFitTitle: null,
     };
   }
 
@@ -1135,6 +1319,8 @@ function buildZoneCompatibility(recommendation, sprinkler, zone, zoneReport, zon
       ],
       preferredFitLabel: null,
       alternateFitLabel: recommendation.family === "spray" ? rotorFit.label : sprayFit.label,
+      preferredFitTitle: null,
+      alternateFitTitle: "Other-family fit",
     };
   }
 
@@ -1143,16 +1329,38 @@ function buildZoneCompatibility(recommendation, sprinkler, zone, zoneReport, zon
   const countsLabel = `${familyCounts.spray} spray / ${familyCounts.rotor} rotor`;
 
   if (recommendation.family === preferredFamily) {
+    const optimizedSingleHeadFitDiffers =
+      context.nozzleSelectionMode === "optimized"
+      && preferredFit.canFit
+      && preferredFit.label !== recommendationLabel;
+
+    if (optimizedSingleHeadFitDiffers) {
+      return {
+        status: "ok",
+        zonePreferredFamily: preferredFamily,
+        familyCounts,
+        headline: `Fits the ${preferredFamily}-dominant zone family.`,
+        detail: `${assignedZone.name} is currently ${countsLabel}. Optimized mode keeps this head in-family with ${recommendationLabel} to balance the full zone, even though the best single-head ${preferredFamily} fit is ${preferredFit.label}.`,
+        suggestions: [
+          `Optimized mode balances neighboring heads, so the zone pick can differ from the single-head ${preferredFamily} fit.`,
+        ],
+        preferredFitTitle: "Zone pick",
+        preferredFitLabel: recommendationLabel,
+        alternateFitTitle: `Single-head ${preferredFamily} fit`,
+        alternateFitLabel: preferredFit.label,
+      };
+    }
+
     return {
       status: "ok",
       zonePreferredFamily: preferredFamily,
       familyCounts,
       headline: `Fits the ${preferredFamily}-dominant zone family.`,
-      detail: `${assignedZone.name} is currently ${countsLabel}. This head stays in-family with ${recommendation.body} ${recommendation.nozzleLabel || recommendation.nozzle}.`,
-      suggestions: preferredFit.canFit
-        ? [`Preferred family fit: ${preferredFit.label}.`]
-        : [],
+      detail: `${assignedZone.name} is currently ${countsLabel}. This head stays in-family with ${recommendationLabel}.`,
+      suggestions: [],
+      preferredFitTitle: `${capitalize(preferredFamily)} fit`,
       preferredFitLabel: preferredFit.label,
+      alternateFitTitle: "Other-family fit",
       alternateFitLabel: alternateFit.label,
     };
   }
@@ -1168,7 +1376,9 @@ function buildZoneCompatibility(recommendation, sprinkler, zone, zoneReport, zon
         `Prefer ${preferredFamily} here to keep the zone uniform unless there is a strong design reason not to.`,
         "Review neighboring heads and precipitation balance before accepting the mismatch.",
       ],
+      preferredFitTitle: `${capitalize(preferredFamily)} fit`,
       preferredFitLabel: preferredFit.label,
+      alternateFitTitle: "Other-family fit",
       alternateFitLabel: alternateFit.label,
     };
   }
@@ -1184,7 +1394,9 @@ function buildZoneCompatibility(recommendation, sprinkler, zone, zoneReport, zon
       "Split the zone if this radius needs to stay different from the dominant family.",
       "Treat the mixed-family recommendation as a last-resort compromise.",
     ],
+    preferredFitTitle: null,
     preferredFitLabel: null,
+    alternateFitTitle: "Available other-family fit",
     alternateFitLabel: alternateFit.label,
   };
 }
@@ -1249,7 +1461,9 @@ function describeRotorFit(sprinkler, zone, zonesById, context) {
     return { canFit: false, label: "No valid rotor fit for strip coverage" };
   }
   const candidates = buildRotorCandidatesForHead(sprinkler, zone, zonesById, context);
-  const bestCandidate = candidates[0] ?? null;
+  const bestCandidate = context.nozzleSelectionMode === "conventional"
+    ? pickConventionalRotorCandidate(sprinkler, candidates)
+    : candidates[0] ?? null;
   return bestCandidate
     ? { canFit: true, label: `${bestCandidate.body} ${bestCandidate.nozzleLabel || bestCandidate.nozzle}` }
     : { canFit: false, label: "No valid rotor fit" };
@@ -1338,11 +1552,78 @@ function nearestFixedArc(arc) {
   );
 }
 
+function prunePreBalancedVariants(variants, desiredArcDeg) {
+  if (!Array.isArray(variants) || !variants.length) {
+    return [];
+  }
+
+  return [...variants]
+    .sort((a, b) => Math.abs(a.nominalArcDeg - desiredArcDeg) - Math.abs(b.nominalArcDeg - desiredArcDeg))
+    .slice(0, 2);
+}
+
+function pickConventionalRotorCandidate(sprinkler, candidates) {
+  if (!Array.isArray(candidates) || !candidates.length) {
+    return null;
+  }
+  return [...candidates].sort((a, b) => compareConventionalRotorCandidates(a, b, sprinkler))[0] ?? null;
+}
+
+function compareConventionalRotorCandidates(a, b, sprinkler) {
+  const typeRankDiff = conventionalRotorTypeRank(a.nozzleType) - conventionalRotorTypeRank(b.nozzleType);
+  if (typeRankDiff !== 0) {
+    return typeRankDiff;
+  }
+
+  const arcMismatchDiff = conventionalRotorArcMismatch(a, sprinkler) - conventionalRotorArcMismatch(b, sprinkler);
+  if (arcMismatchDiff !== 0) {
+    return arcMismatchDiff;
+  }
+
+  const radiusScoreDiff = scoreRadiusCandidate(a.selectedRadiusFt ?? sprinkler.radius, sprinkler.radius)
+    - scoreRadiusCandidate(b.selectedRadiusFt ?? sprinkler.radius, sprinkler.radius);
+  if (radiusScoreDiff !== 0) {
+    return radiusScoreDiff;
+  }
+
+  if (a.coverageReserveFt !== b.coverageReserveFt) {
+    return a.coverageReserveFt - b.coverageReserveFt;
+  }
+  if (a.flowGpm !== b.flowGpm) {
+    return a.flowGpm - b.flowGpm;
+  }
+  return String(a.nozzle ?? "").localeCompare(String(b.nozzle ?? ""));
+}
+
+function conventionalRotorTypeRank(nozzleType) {
+  if (nozzleType === "pre-balanced rotor") {
+    return 0;
+  }
+  if (nozzleType === "standard-angle rotor") {
+    return 1;
+  }
+  if (nozzleType === "low-angle rotor") {
+    return 2;
+  }
+  if (nozzleType === "adjustable rotor") {
+    return 3;
+  }
+  return 4;
+}
+
+function conventionalRotorArcMismatch(candidate, sprinkler) {
+  const desiredArcDeg = Number(sprinkler?.desiredArcDeg) || 0;
+  const nominalArcDeg = Number.isFinite(Number(candidate?.nominalArcDeg))
+    ? Number(candidate.nominalArcDeg)
+    : Number(candidate?.selectedArcDeg ?? desiredArcDeg) || desiredArcDeg;
+  return Math.abs(nominalArcDeg - desiredArcDeg);
+}
+
 function pctReduction(selectedRadius, desiredRadius) {
   return ((selectedRadius - desiredRadius) / Math.max(selectedRadius, 0.1)) * 100;
 }
 
-function scoreRotorAssignment(picks, assumptions) {
+function scoreRotorAssignment(picks, assumptions, optimizationContext = null) {
   const totalFlowGpm = picks.reduce((sum, pick) => sum + pick.flowGpm, 0);
   const actualPrecipValues = picks
     .map((pick) => pick.actualPrecipInHr)
@@ -1350,11 +1631,18 @@ function scoreRotorAssignment(picks, assumptions) {
   const precipSpread = actualPrecipValues.length
     ? Math.max(...actualPrecipValues) - Math.min(...actualPrecipValues)
     : 0;
+  const overlapMetrics = scoreOverlapUniformity(picks, optimizationContext, assumptions);
 
   return {
     flowOverageGpm: Math.max(0, totalFlowGpm - assumptions.designFlowLimitGpm),
     totalFlowGpm,
     precipSpread,
+    uniformityScore: overlapMetrics.uniformityScore,
+    dryPenalty: overlapMetrics.dryPenalty,
+    wetPenalty: overlapMetrics.wetPenalty,
+    normalizedRateSpread: overlapMetrics.normalizedRateSpread,
+    meanCoveredRateInHr: overlapMetrics.meanCoveredRateInHr,
+    wateredCellCount: overlapMetrics.wateredCellCount,
     specialtyCount: picks.filter((pick) => pick.nozzleType !== "pre-balanced rotor").length,
     lowAngleCount: picks.filter((pick) => pick.nozzleType === "low-angle rotor").length,
     uniqueFamilies: new Set(picks.map((pick) => pick.skuFamily)).size,
@@ -1389,20 +1677,28 @@ function compareRotorScores(a, b, assumptions) {
   if (a.flowOverageGpm !== b.flowOverageGpm) {
     return a.flowOverageGpm - b.flowOverageGpm;
   }
-  if (Math.abs(a.precipSpread - b.precipSpread) > assumptions.rotorSimplicityPrecipToleranceInHr) {
-    return a.precipSpread - b.precipSpread;
-  }
   if (a.specialtyCount !== b.specialtyCount) {
     return a.specialtyCount - b.specialtyCount;
   }
   if (a.lowAngleCount !== b.lowAngleCount) {
     return a.lowAngleCount - b.lowAngleCount;
   }
+  if (Number.isFinite(a.uniformityScore) && Number.isFinite(b.uniformityScore)) {
+    if (Math.abs(a.uniformityScore - b.uniformityScore) > assumptions.rotorUniformityTolerance) {
+      return a.uniformityScore - b.uniformityScore;
+    }
+    if (Math.abs(a.dryPenalty - b.dryPenalty) > assumptions.rotorUniformityTolerance) {
+      return a.dryPenalty - b.dryPenalty;
+    }
+  }
   if (a.uniqueFamilies !== b.uniqueFamilies) {
     return a.uniqueFamilies - b.uniqueFamilies;
   }
   if (a.uniqueNozzleTypes !== b.uniqueNozzleTypes) {
     return a.uniqueNozzleTypes - b.uniqueNozzleTypes;
+  }
+  if (Math.abs(a.precipSpread - b.precipSpread) > assumptions.rotorSimplicityPrecipToleranceInHr) {
+    return a.precipSpread - b.precipSpread;
   }
   if (a.precipSpread !== b.precipSpread) {
     return a.precipSpread - b.precipSpread;
@@ -1414,6 +1710,135 @@ function compareRotorScores(a, b, assumptions) {
     return a.totalFlowGpm - b.totalFlowGpm;
   }
   return a.maxAdjustmentPct - b.maxAdjustmentPct;
+}
+
+function buildRotorOptimizationContext(rotors, context) {
+  const pixelsPerUnit = Number(context?.optimizerPixelsPerUnit);
+  if (!(pixelsPerUnit > 0) || !rotors.length) {
+    return null;
+  }
+
+  const cellSizeWorldPx = Math.max(4, Number(context?.assumptions?.rotorOptimizationCellPx) || 18);
+  const bounds = buildCoverageBounds(rotors, pixelsPerUnit);
+  if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+    return null;
+  }
+
+  const cols = Math.max(1, Math.ceil(bounds.width / cellSizeWorldPx));
+  const rows = Math.max(1, Math.ceil(bounds.height / cellSizeWorldPx));
+  const headCellIndices = rotors.map((rotor) => {
+    const indices = [];
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        const cellIndex = row * cols + col;
+        const x = bounds.x + (col + 0.5) * cellSizeWorldPx;
+        const y = bounds.y + (row + 0.5) * cellSizeWorldPx;
+        if (pointFallsWithinCoverage(x, y, rotor, pixelsPerUnit)) {
+          indices.push(cellIndex);
+        }
+      }
+    }
+    return indices;
+  });
+
+  return {
+    cols,
+    rows,
+    bounds,
+    cellSizeWorldPx,
+    cellCount: cols * rows,
+    headCellIndices,
+    headIndexById: new Map(rotors.map((rotor, index) => [rotor.id, index])),
+  };
+}
+
+function buildCoverageBounds(items, pixelsPerUnit) {
+  if (!items.length || !(pixelsPerUnit > 0)) {
+    return null;
+  }
+
+  const extents = items.map((item) => resolveCoverageBounds(item, pixelsPerUnit));
+  const minX = Math.min(...extents.map((extent) => extent.minX));
+  const maxX = Math.max(...extents.map((extent) => extent.maxX));
+  const minY = Math.min(...extents.map((extent) => extent.minY));
+  const maxY = Math.max(...extents.map((extent) => extent.maxY));
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function scoreOverlapUniformity(picks, optimizationContext, assumptions) {
+  if (!optimizationContext?.cellCount || !picks.length) {
+    return {
+      uniformityScore: Number.NaN,
+      dryPenalty: Number.NaN,
+      wetPenalty: Number.NaN,
+      normalizedRateSpread: Number.NaN,
+      meanCoveredRateInHr: 0,
+      wateredCellCount: 0,
+    };
+  }
+
+  const values = new Float32Array(optimizationContext.cellCount);
+  for (const pick of picks) {
+    const headIndex = optimizationContext.headIndexById.get(pick.id);
+    if (!Number.isInteger(headIndex)) {
+      continue;
+    }
+    const coveredCells = optimizationContext.headCellIndices[headIndex] ?? [];
+    for (const cellIndex of coveredCells) {
+      values[cellIndex] += pick.actualPrecipInHr;
+    }
+  }
+
+  let wateredCellCount = 0;
+  let coveredRateSum = 0;
+  for (const value of values) {
+    if (value > 0) {
+      wateredCellCount += 1;
+      coveredRateSum += value;
+    }
+  }
+
+  if (!wateredCellCount || !(coveredRateSum > 0)) {
+    return {
+      uniformityScore: Number.NaN,
+      dryPenalty: Number.NaN,
+      wetPenalty: Number.NaN,
+      normalizedRateSpread: Number.NaN,
+      meanCoveredRateInHr: 0,
+      wateredCellCount: 0,
+    };
+  }
+
+  const meanCoveredRateInHr = coveredRateSum / wateredCellCount;
+  let dryPenaltySum = 0;
+  let wetPenaltySum = 0;
+  let minNormalizedRate = Number.POSITIVE_INFINITY;
+  let maxNormalizedRate = 0;
+
+  for (const value of values) {
+    if (!(value > 0)) {
+      continue;
+    }
+    const normalizedRate = value / meanCoveredRateInHr;
+    minNormalizedRate = Math.min(minNormalizedRate, normalizedRate);
+    maxNormalizedRate = Math.max(maxNormalizedRate, normalizedRate);
+    if (normalizedRate < 1) {
+      dryPenaltySum += (1 - normalizedRate) ** 2;
+    } else {
+      wetPenaltySum += (normalizedRate - 1) ** 2;
+    }
+  }
+
+  const dryPenalty = dryPenaltySum / wateredCellCount;
+  const wetPenalty = wetPenaltySum / wateredCellCount;
+  return {
+    uniformityScore: (assumptions.rotorUniformityDryWeight * dryPenalty) + (assumptions.rotorUniformityWetWeight * wetPenalty),
+    dryPenalty,
+    wetPenalty,
+    normalizedRateSpread: maxNormalizedRate - minNormalizedRate,
+    meanCoveredRateInHr,
+    wateredCellCount,
+  };
 }
 
 function buildAnalysisGrid(state, recommendations, zones, targetDepthInches) {
