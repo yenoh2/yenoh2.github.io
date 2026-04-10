@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HVAC residential heating and cooling load calculator — Manual J-style BTU computation for up to 19 rooms.">
+  <title>HVAC Load Calculator</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <div class="app">
+    <!-- ─── Header ─── -->
+    <header class="app-header">
+      <h1>HVAC Load Calculator</h1>
+      <p>Residential heating &amp; cooling load analysis</p>
+    </header>
+
+    <!-- ─── Step Indicator ─── -->
+    <nav class="step-indicator" id="stepIndicator">
+      <div class="step-dot active" data-step="1">
+        <span class="step-num">1</span><span>Project Info</span>
+      </div>
+      <div class="step-dot" data-step="2">
+        <span class="step-num">2</span><span>Building Config</span>
+      </div>
+      <div class="step-dot" data-step="3">
+        <span class="step-num">3</span><span>Rooms</span>
+      </div>
+      <div class="step-dot" data-step="4">
+        <span class="step-num">4</span><span>Results</span>
+      </div>
+    </nav>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- STEP 1: Project Info                                    -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <section class="step-panel active" id="step1">
+      <div class="card">
+        <div class="card-title"><span class="icon">📋</span> Project Information</div>
+        <div class="form-grid cols-2">
+          <div class="form-group">
+            <label for="customerName">Customer Name</label>
+            <input type="text" id="customerName" placeholder="e.g. John Smith">
+          </div>
+          <div class="form-group">
+            <label for="projectDate">Date</label>
+            <input type="date" id="projectDate">
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label for="customerAddress">Address</label>
+            <input type="text" id="customerAddress" placeholder="e.g. 123 Main St, Salt Lake City, UT">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="icon">🌡️</span> Design Temperatures</div>
+        <div class="form-grid cols-4">
+          <div class="form-group">
+            <label for="summerOutside">Summer Outside (°F)</label>
+            <input type="number" id="summerOutside" value="100" step="1">
+          </div>
+          <div class="form-group">
+            <label for="summerInside">Summer Inside (°F)</label>
+            <input type="number" id="summerInside" value="75" step="1">
+          </div>
+          <div class="form-group">
+            <label for="winterInside">Winter Inside (°F)</label>
+            <input type="number" id="winterInside" value="70" step="1">
+          </div>
+          <div class="form-group">
+            <label for="globalCeilingHeight">Ceiling Height (ft)</label>
+            <input type="number" id="globalCeilingHeight" value="8" step="0.5" min="6" max="20">
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <div></div>
+        <button class="btn btn-primary" onclick="app.goToStep(2)">Next → Building Config</button>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- STEP 2: Building Configuration                         -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <section class="step-panel" id="step2">
+      <div class="card">
+        <div class="card-title"><span class="icon">🏠</span> Building Materials &amp; Insulation</div>
+        <div class="form-grid cols-3">
+          <div class="form-group">
+            <label for="wallInsulation">Wall Insulation</label>
+            <select id="wallInsulation">
+              <option value="none">No Insulation</option>
+              <option value="R-5">R-5</option>
+              <option value="R-11">R-11</option>
+              <option value="R-13" selected>R-13</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="floorInsulation">Floor Insulation</label>
+            <select id="floorInsulation">
+              <option value="none">No Insulation</option>
+              <option value="R-11">R-11</option>
+              <option value="R-19" selected>R-19</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="windowType">Window Glass</label>
+            <select id="windowType">
+              <option value="single">Single Pane</option>
+              <option value="double" selected>Double Pane</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="doorType">Door Type</label>
+            <select id="doorType">
+              <option value="hollow">Hollow Core</option>
+              <option value="solid" selected>Solid Core</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="basementWallInsulation">Basement Wall</label>
+            <select id="basementWallInsulation">
+              <option value="none">No Insulation</option>
+              <option value="R-11" selected>R-11</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="tempMode">Temperature Zone</label>
+            <select id="tempMode">
+              <option value="75" selected>75°F Differential</option>
+              <option value="90">90°F Differential</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-secondary" onclick="app.goToStep(1)">← Back</button>
+        <button class="btn btn-primary" onclick="app.goToStep(3)">Next → Rooms</button>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- STEP 3: Room Editor                                     -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <section class="step-panel" id="step3">
+      <div class="room-tabs" id="roomTabs"></div>
+
+      <div id="roomEditor">
+        <!-- Dynamically rendered by app.js -->
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-secondary" onclick="app.goToStep(2)">← Back</button>
+        <button class="btn btn-primary" onclick="app.goToStep(4)">Calculate Results →</button>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- STEP 4: Results Dashboard                               -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <section class="step-panel" id="step4">
+      <div class="results-summary" id="resultsSummary">
+        <!-- Rendered by app.js -->
+      </div>
+
+      <div class="room-results-grid" id="roomResultsGrid">
+        <!-- Rendered by app.js -->
+      </div>
+
+      <div class="btn-group mt-lg">
+        <button class="btn btn-secondary" onclick="app.goToStep(3)">← Edit Rooms</button>
+        <button class="btn btn-primary" onclick="window.print()">🖨️ Print Report</button>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
