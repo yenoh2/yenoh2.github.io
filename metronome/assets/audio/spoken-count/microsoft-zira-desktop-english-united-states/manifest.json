@@ -1,0 +1,718 @@
+﻿{
+    "generatedAt":  "2026-04-12T22:29:38",
+    "voiceHint":  "Microsoft Zira Desktop",
+    "voiceDescription":  "Microsoft Zira Desktop - English (United States)",
+    "voiceId":  "microsoft-zira-desktop-english-united-states",
+    "packs":  [
+                  {
+                      "id":  "natural",
+                      "rate":  0,
+                      "words":  {
+                                    "one":  {
+                                                "text":  "one",
+                                                "rate":  0,
+                                                "file":  "natural/words/one.wav",
+                                                "durationMs":  440,
+                                                "originalMs":  1304.4,
+                                                "leadingTrimMs":  124.6,
+                                                "trailingTrimMs":  739.8,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "and":  {
+                                                "text":  "and",
+                                                "rate":  0,
+                                                "file":  "natural/words/and.wav",
+                                                "durationMs":  361.9,
+                                                "originalMs":  1234.4,
+                                                "leadingTrimMs":  101.5,
+                                                "trailingTrimMs":  771.1,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "two":  {
+                                                "text":  "two",
+                                                "rate":  0,
+                                                "file":  "natural/words/two.wav",
+                                                "durationMs":  291.2,
+                                                "originalMs":  1139.4,
+                                                "leadingTrimMs":  100,
+                                                "trailingTrimMs":  748.3,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "three":  {
+                                                  "text":  "three",
+                                                  "rate":  0,
+                                                  "file":  "natural/words/three.wav",
+                                                  "durationMs":  369.7,
+                                                  "originalMs":  1274.4,
+                                                  "leadingTrimMs":  157.9,
+                                                  "trailingTrimMs":  746.9,
+                                                  "sampleRate":  22050,
+                                                  "channels":  1,
+                                                  "bitsPerSample":  16
+                                              },
+                                    "four":  {
+                                                 "text":  "four",
+                                                 "rate":  0,
+                                                 "file":  "natural/words/four.wav",
+                                                 "durationMs":  447.5,
+                                                 "originalMs":  1369.4,
+                                                 "leadingTrimMs":  183.8,
+                                                 "trailingTrimMs":  738.1,
+                                                 "sampleRate":  22050,
+                                                 "channels":  1,
+                                                 "bitsPerSample":  16
+                                             }
+                                },
+                      "pairs":  {
+                                    "one_and":  {
+                                                    "text":  "one and",
+                                                    "rate":  0,
+                                                    "file":  "natural/pairs/one_and.wav",
+                                                    "durationMs":  517.2,
+                                                    "originalMs":  1404.3,
+                                                    "leadingTrimMs":  112.8,
+                                                    "trailingTrimMs":  774.3,
+                                                    "sampleRate":  22050,
+                                                    "channels":  1,
+                                                    "bitsPerSample":  16
+                                                },
+                                    "two_and":  {
+                                                    "text":  "two and",
+                                                    "rate":  0,
+                                                    "file":  "natural/pairs/two_and.wav",
+                                                    "durationMs":  519.3,
+                                                    "originalMs":  1389.3,
+                                                    "leadingTrimMs":  100,
+                                                    "trailingTrimMs":  770.1,
+                                                    "sampleRate":  22050,
+                                                    "channels":  1,
+                                                    "bitsPerSample":  16
+                                                },
+                                    "three_and":  {
+                                                      "text":  "three and",
+                                                      "rate":  0,
+                                                      "file":  "natural/pairs/three_and.wav",
+                                                      "durationMs":  526.3,
+                                                      "originalMs":  1419.3,
+                                                      "leadingTrimMs":  121.2,
+                                                      "trailingTrimMs":  771.8,
+                                                      "sampleRate":  22050,
+                                                      "channels":  1,
+                                                      "bitsPerSample":  16
+                                                  },
+                                    "four_and":  {
+                                                     "text":  "four and",
+                                                     "rate":  0,
+                                                     "file":  "natural/pairs/four_and.wav",
+                                                     "durationMs":  536.7,
+                                                     "originalMs":  1449.3,
+                                                     "leadingTrimMs":  146.7,
+                                                     "trailingTrimMs":  766,
+                                                     "sampleRate":  22050,
+                                                     "channels":  1,
+                                                     "bitsPerSample":  16
+                                                 }
+                                },
+                      "demos":  {
+                                    "demo_full_count_4_4":  {
+                                                                "text":  "one and two and three and four and",
+                                                                "rate":  0,
+                                                                "file":  "natural/demos/demo_full_count_4_4.wav",
+                                                                "durationMs":  1742.1,
+                                                                "originalMs":  2624,
+                                                                "leadingTrimMs":  113,
+                                                                "trailingTrimMs":  769,
+                                                                "sampleRate":  22050,
+                                                                "channels":  1,
+                                                                "bitsPerSample":  16
+                                                            },
+                                    "demo_count_in_4":  {
+                                                            "text":  "one two three four",
+                                                            "rate":  0,
+                                                            "file":  "natural/demos/demo_count_in_4.wav",
+                                                            "durationMs":  1108,
+                                                            "originalMs":  1974.2,
+                                                            "leadingTrimMs":  113,
+                                                            "trailingTrimMs":  753.3,
+                                                            "sampleRate":  22050,
+                                                            "channels":  1,
+                                                            "bitsPerSample":  16
+                                                        }
+                                }
+                  },
+                  {
+                      "id":  "tight",
+                      "rate":  2,
+                      "words":  {
+                                    "one":  {
+                                                "text":  "one",
+                                                "rate":  2,
+                                                "file":  "tight/words/one.wav",
+                                                "durationMs":  345.9,
+                                                "originalMs":  1039.4,
+                                                "leadingTrimMs":  93.9,
+                                                "trailingTrimMs":  599.6,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "and":  {
+                                                "text":  "and",
+                                                "rate":  2,
+                                                "file":  "tight/words/and.wav",
+                                                "durationMs":  289.6,
+                                                "originalMs":  984.4,
+                                                "leadingTrimMs":  81.7,
+                                                "trailingTrimMs":  613.2,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "two":  {
+                                                "text":  "two",
+                                                "rate":  2,
+                                                "file":  "tight/words/two.wav",
+                                                "durationMs":  237.1,
+                                                "originalMs":  909.4,
+                                                "leadingTrimMs":  75.6,
+                                                "trailingTrimMs":  596.7,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "three":  {
+                                                  "text":  "three",
+                                                  "rate":  2,
+                                                  "file":  "tight/words/three.wav",
+                                                  "durationMs":  302.3,
+                                                  "originalMs":  1014.4,
+                                                  "leadingTrimMs":  115.4,
+                                                  "trailingTrimMs":  596.7,
+                                                  "sampleRate":  22050,
+                                                  "channels":  1,
+                                                  "bitsPerSample":  16
+                                              },
+                                    "four":  {
+                                                 "text":  "four",
+                                                 "rate":  2,
+                                                 "file":  "tight/words/four.wav",
+                                                 "durationMs":  353.2,
+                                                 "originalMs":  1089.4,
+                                                 "leadingTrimMs":  138,
+                                                 "trailingTrimMs":  598.3,
+                                                 "sampleRate":  22050,
+                                                 "channels":  1,
+                                                 "bitsPerSample":  16
+                                             }
+                                },
+                      "pairs":  {
+                                    "one_and":  {
+                                                    "text":  "one and",
+                                                    "rate":  2,
+                                                    "file":  "tight/pairs/one_and.wav",
+                                                    "durationMs":  407.1,
+                                                    "originalMs":  1114.4,
+                                                    "leadingTrimMs":  87.3,
+                                                    "trailingTrimMs":  620,
+                                                    "sampleRate":  22050,
+                                                    "channels":  1,
+                                                    "bitsPerSample":  16
+                                                },
+                                    "two_and":  {
+                                                    "text":  "two and",
+                                                    "rate":  2,
+                                                    "file":  "tight/pairs/two_and.wav",
+                                                    "durationMs":  416,
+                                                    "originalMs":  1104.4,
+                                                    "leadingTrimMs":  75.6,
+                                                    "trailingTrimMs":  612.7,
+                                                    "sampleRate":  22050,
+                                                    "channels":  1,
+                                                    "bitsPerSample":  16
+                                                },
+                                    "three_and":  {
+                                                      "text":  "three and",
+                                                      "rate":  2,
+                                                      "file":  "tight/pairs/three_and.wav",
+                                                      "durationMs":  407,
+                                                      "originalMs":  1124.4,
+                                                      "leadingTrimMs":  96.6,
+                                                      "trailingTrimMs":  620.8,
+                                                      "sampleRate":  22050,
+                                                      "channels":  1,
+                                                      "bitsPerSample":  16
+                                                  },
+                                    "four_and":  {
+                                                     "text":  "four and",
+                                                     "rate":  2,
+                                                     "file":  "tight/pairs/four_and.wav",
+                                                     "durationMs":  417.6,
+                                                     "originalMs":  1149.4,
+                                                     "leadingTrimMs":  115.3,
+                                                     "trailingTrimMs":  616.5,
+                                                     "sampleRate":  22050,
+                                                     "channels":  1,
+                                                     "bitsPerSample":  16
+                                                 }
+                                },
+                      "demos":  {
+                                    "demo_full_count_4_4":  {
+                                                                "text":  "one and two and three and four and",
+                                                                "rate":  2,
+                                                                "file":  "tight/demos/demo_full_count_4_4.wav",
+                                                                "durationMs":  1369.8,
+                                                                "originalMs":  2079.1,
+                                                                "leadingTrimMs":  87.5,
+                                                                "trailingTrimMs":  621.8,
+                                                                "sampleRate":  22050,
+                                                                "channels":  1,
+                                                                "bitsPerSample":  16
+                                                            },
+                                    "demo_count_in_4":  {
+                                                            "text":  "one two three four",
+                                                            "rate":  2,
+                                                            "file":  "tight/demos/demo_count_in_4.wav",
+                                                            "durationMs":  879.3,
+                                                            "originalMs":  1559.3,
+                                                            "leadingTrimMs":  87.5,
+                                                            "trailingTrimMs":  592.5,
+                                                            "sampleRate":  22050,
+                                                            "channels":  1,
+                                                            "bitsPerSample":  16
+                                                        }
+                                }
+                  },
+                  {
+                      "id":  "brisk",
+                      "rate":  4,
+                      "words":  {
+                                    "one":  {
+                                                "text":  "one",
+                                                "rate":  4,
+                                                "file":  "brisk/words/one.wav",
+                                                "durationMs":  282.2,
+                                                "originalMs":  824.4,
+                                                "leadingTrimMs":  73.7,
+                                                "trailingTrimMs":  468.4,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "and":  {
+                                                "text":  "and",
+                                                "rate":  4,
+                                                "file":  "brisk/words/and.wav",
+                                                "durationMs":  228.4,
+                                                "originalMs":  779.4,
+                                                "leadingTrimMs":  62,
+                                                "trailingTrimMs":  489,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "two":  {
+                                                "text":  "two",
+                                                "rate":  4,
+                                                "file":  "brisk/words/two.wav",
+                                                "durationMs":  185.4,
+                                                "originalMs":  719.4,
+                                                "leadingTrimMs":  60.1,
+                                                "trailingTrimMs":  474,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "three":  {
+                                                  "text":  "three",
+                                                  "rate":  4,
+                                                  "file":  "brisk/words/three.wav",
+                                                  "durationMs":  228.2,
+                                                  "originalMs":  804.4,
+                                                  "leadingTrimMs":  101.7,
+                                                  "trailingTrimMs":  474.6,
+                                                  "sampleRate":  22050,
+                                                  "channels":  1,
+                                                  "bitsPerSample":  16
+                                              },
+                                    "four":  {
+                                                 "text":  "four",
+                                                 "rate":  4,
+                                                 "file":  "brisk/words/four.wav",
+                                                 "durationMs":  279.7,
+                                                 "originalMs":  864.4,
+                                                 "leadingTrimMs":  115.3,
+                                                 "trailingTrimMs":  469.3,
+                                                 "sampleRate":  22050,
+                                                 "channels":  1,
+                                                 "bitsPerSample":  16
+                                             }
+                                },
+                      "pairs":  {
+                                    "one_and":  {
+                                                    "text":  "one and",
+                                                    "rate":  4,
+                                                    "file":  "brisk/pairs/one_and.wav",
+                                                    "durationMs":  325.4,
+                                                    "originalMs":  884.4,
+                                                    "leadingTrimMs":  67,
+                                                    "trailingTrimMs":  491.9,
+                                                    "sampleRate":  22050,
+                                                    "channels":  1,
+                                                    "bitsPerSample":  16
+                                                },
+                                    "two_and":  {
+                                                    "text":  "two and",
+                                                    "rate":  4,
+                                                    "file":  "brisk/pairs/two_and.wav",
+                                                    "durationMs":  323.3,
+                                                    "originalMs":  874.3,
+                                                    "leadingTrimMs":  60.1,
+                                                    "trailingTrimMs":  491,
+                                                    "sampleRate":  22050,
+                                                    "channels":  1,
+                                                    "bitsPerSample":  16
+                                                },
+                                    "three_and":  {
+                                                      "text":  "three and",
+                                                      "rate":  4,
+                                                      "file":  "brisk/pairs/three_and.wav",
+                                                      "durationMs":  327.6,
+                                                      "originalMs":  894.4,
+                                                      "leadingTrimMs":  73,
+                                                      "trailingTrimMs":  493.8,
+                                                      "sampleRate":  22050,
+                                                      "channels":  1,
+                                                      "bitsPerSample":  16
+                                                  },
+                                    "four_and":  {
+                                                     "text":  "four and",
+                                                     "rate":  4,
+                                                     "file":  "brisk/pairs/four_and.wav",
+                                                     "durationMs":  324.9,
+                                                     "originalMs":  914.4,
+                                                     "leadingTrimMs":  99.8,
+                                                     "trailingTrimMs":  489.7,
+                                                     "sampleRate":  22050,
+                                                     "channels":  1,
+                                                     "bitsPerSample":  16
+                                                 }
+                                },
+                      "demos":  {
+                                    "demo_full_count_4_4":  {
+                                                                "text":  "one and two and three and four and",
+                                                                "rate":  4,
+                                                                "file":  "brisk/demos/demo_full_count_4_4.wav",
+                                                                "durationMs":  1096.1,
+                                                                "originalMs":  1649.3,
+                                                                "leadingTrimMs":  67,
+                                                                "trailingTrimMs":  486.2,
+                                                                "sampleRate":  22050,
+                                                                "channels":  1,
+                                                                "bitsPerSample":  16
+                                                            },
+                                    "demo_count_in_4":  {
+                                                            "text":  "one two three four",
+                                                            "rate":  4,
+                                                            "file":  "brisk/demos/demo_count_in_4.wav",
+                                                            "durationMs":  693.7,
+                                                            "originalMs":  1234.3,
+                                                            "leadingTrimMs":  67,
+                                                            "trailingTrimMs":  473.6,
+                                                            "sampleRate":  22050,
+                                                            "channels":  1,
+                                                            "bitsPerSample":  16
+                                                        }
+                                }
+                  },
+                  {
+                      "id":  "rapid",
+                      "rate":  6,
+                      "words":  {
+                                    "one":  {
+                                                "text":  "one",
+                                                "rate":  6,
+                                                "file":  "rapid/words/one.wav",
+                                                "durationMs":  220.2,
+                                                "originalMs":  664.4,
+                                                "leadingTrimMs":  64.1,
+                                                "trailingTrimMs":  380.1,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "and":  {
+                                                "text":  "and",
+                                                "rate":  6,
+                                                "file":  "rapid/words/and.wav",
+                                                "durationMs":  183,
+                                                "originalMs":  624.4,
+                                                "leadingTrimMs":  52.3,
+                                                "trailingTrimMs":  389.1,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "two":  {
+                                                "text":  "two",
+                                                "rate":  6,
+                                                "file":  "rapid/words/two.wav",
+                                                "durationMs":  155.3,
+                                                "originalMs":  579.5,
+                                                "leadingTrimMs":  50.2,
+                                                "trailingTrimMs":  374,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "three":  {
+                                                  "text":  "three",
+                                                  "rate":  6,
+                                                  "file":  "rapid/words/three.wav",
+                                                  "durationMs":  180.1,
+                                                  "originalMs":  644.4,
+                                                  "leadingTrimMs":  92.7,
+                                                  "trailingTrimMs":  371.6,
+                                                  "sampleRate":  22050,
+                                                  "channels":  1,
+                                                  "bitsPerSample":  16
+                                              },
+                                    "four":  {
+                                                 "text":  "four",
+                                                 "rate":  6,
+                                                 "file":  "rapid/words/four.wav",
+                                                 "durationMs":  219.7,
+                                                 "originalMs":  699.5,
+                                                 "leadingTrimMs":  101.7,
+                                                 "trailingTrimMs":  378,
+                                                 "sampleRate":  22050,
+                                                 "channels":  1,
+                                                 "bitsPerSample":  16
+                                             }
+                                },
+                      "pairs":  {
+                                    "one_and":  {
+                                                    "text":  "one and",
+                                                    "rate":  6,
+                                                    "file":  "rapid/pairs/one_and.wav",
+                                                    "durationMs":  255.7,
+                                                    "originalMs":  704.3,
+                                                    "leadingTrimMs":  51.8,
+                                                    "trailingTrimMs":  396.8,
+                                                    "sampleRate":  22050,
+                                                    "channels":  1,
+                                                    "bitsPerSample":  16
+                                                },
+                                    "two_and":  {
+                                                    "text":  "two and",
+                                                    "rate":  6,
+                                                    "file":  "rapid/pairs/two_and.wav",
+                                                    "durationMs":  250,
+                                                    "originalMs":  699.4,
+                                                    "leadingTrimMs":  50.2,
+                                                    "trailingTrimMs":  399.2,
+                                                    "sampleRate":  22050,
+                                                    "channels":  1,
+                                                    "bitsPerSample":  16
+                                                },
+                                    "three_and":  {
+                                                      "text":  "three and",
+                                                      "rate":  6,
+                                                      "file":  "rapid/pairs/three_and.wav",
+                                                      "durationMs":  250.1,
+                                                      "originalMs":  709.3,
+                                                      "leadingTrimMs":  61.4,
+                                                      "trailingTrimMs":  397.8,
+                                                      "sampleRate":  22050,
+                                                      "channels":  1,
+                                                      "bitsPerSample":  16
+                                                  },
+                                    "four_and":  {
+                                                     "text":  "four and",
+                                                     "rate":  6,
+                                                     "file":  "rapid/pairs/four_and.wav",
+                                                     "durationMs":  261.6,
+                                                     "originalMs":  729.3,
+                                                     "leadingTrimMs":  76,
+                                                     "trailingTrimMs":  391.7,
+                                                     "sampleRate":  22050,
+                                                     "channels":  1,
+                                                     "bitsPerSample":  16
+                                                 }
+                                },
+                      "demos":  {
+                                    "demo_full_count_4_4":  {
+                                                                "text":  "one and two and three and four and",
+                                                                "rate":  6,
+                                                                "file":  "rapid/demos/demo_full_count_4_4.wav",
+                                                                "durationMs":  857.5,
+                                                                "originalMs":  1299,
+                                                                "leadingTrimMs":  51.8,
+                                                                "trailingTrimMs":  389.7,
+                                                                "sampleRate":  22050,
+                                                                "channels":  1,
+                                                                "bitsPerSample":  16
+                                                            },
+                                    "demo_count_in_4":  {
+                                                            "text":  "one two three four",
+                                                            "rate":  6,
+                                                            "file":  "rapid/demos/demo_count_in_4.wav",
+                                                            "durationMs":  552.7,
+                                                            "originalMs":  984.3,
+                                                            "leadingTrimMs":  51.7,
+                                                            "trailingTrimMs":  379.8,
+                                                            "sampleRate":  22050,
+                                                            "channels":  1,
+                                                            "bitsPerSample":  16
+                                                        }
+                                }
+                  },
+                  {
+                      "id":  "sprint",
+                      "rate":  8,
+                      "words":  {
+                                    "one":  {
+                                                "text":  "one",
+                                                "rate":  8,
+                                                "file":  "sprint/words/one.wav",
+                                                "durationMs":  188.3,
+                                                "originalMs":  529.4,
+                                                "leadingTrimMs":  42.6,
+                                                "trailingTrimMs":  298.5,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "and":  {
+                                                "text":  "and",
+                                                "rate":  8,
+                                                "file":  "sprint/words/and.wav",
+                                                "durationMs":  147.7,
+                                                "originalMs":  504.4,
+                                                "leadingTrimMs":  42.5,
+                                                "trailingTrimMs":  314.2,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "two":  {
+                                                "text":  "two",
+                                                "rate":  8,
+                                                "file":  "sprint/words/two.wav",
+                                                "durationMs":  125.2,
+                                                "originalMs":  464.4,
+                                                "leadingTrimMs":  40.5,
+                                                "trailingTrimMs":  298.7,
+                                                "sampleRate":  22050,
+                                                "channels":  1,
+                                                "bitsPerSample":  16
+                                            },
+                                    "three":  {
+                                                  "text":  "three",
+                                                  "rate":  8,
+                                                  "file":  "sprint/words/three.wav",
+                                                  "durationMs":  156,
+                                                  "originalMs":  519.4,
+                                                  "leadingTrimMs":  64.9,
+                                                  "trailingTrimMs":  298.5,
+                                                  "sampleRate":  22050,
+                                                  "channels":  1,
+                                                  "bitsPerSample":  16
+                                              },
+                                    "four":  {
+                                                 "text":  "four",
+                                                 "rate":  8,
+                                                 "file":  "sprint/words/four.wav",
+                                                 "durationMs":  187.8,
+                                                 "originalMs":  554.4,
+                                                 "leadingTrimMs":  75,
+                                                 "trailingTrimMs":  291.7,
+                                                 "sampleRate":  22050,
+                                                 "channels":  1,
+                                                 "bitsPerSample":  16
+                                             }
+                                },
+                      "pairs":  {
+                                    "one_and":  {
+                                                    "text":  "one and",
+                                                    "rate":  8,
+                                                    "file":  "sprint/pairs/one_and.wav",
+                                                    "durationMs":  209.8,
+                                                    "originalMs":  564.4,
+                                                    "leadingTrimMs":  36.6,
+                                                    "trailingTrimMs":  318,
+                                                    "sampleRate":  22050,
+                                                    "channels":  1,
+                                                    "bitsPerSample":  16
+                                                },
+                                    "two_and":  {
+                                                    "text":  "two and",
+                                                    "rate":  8,
+                                                    "file":  "sprint/pairs/two_and.wav",
+                                                    "durationMs":  205.9,
+                                                    "originalMs":  564.4,
+                                                    "leadingTrimMs":  40.5,
+                                                    "trailingTrimMs":  318,
+                                                    "sampleRate":  22050,
+                                                    "channels":  1,
+                                                    "bitsPerSample":  16
+                                                },
+                                    "three_and":  {
+                                                      "text":  "three and",
+                                                      "rate":  8,
+                                                      "file":  "sprint/pairs/three_and.wav",
+                                                      "durationMs":  208.8,
+                                                      "originalMs":  569.3,
+                                                      "leadingTrimMs":  45.6,
+                                                      "trailingTrimMs":  314.9,
+                                                      "sampleRate":  22050,
+                                                      "channels":  1,
+                                                      "bitsPerSample":  16
+                                                  },
+                                    "four_and":  {
+                                                     "text":  "four and",
+                                                     "rate":  8,
+                                                     "file":  "sprint/pairs/four_and.wav",
+                                                     "durationMs":  196.4,
+                                                     "originalMs":  579.4,
+                                                     "leadingTrimMs":  68.7,
+                                                     "trailingTrimMs":  314.2,
+                                                     "sampleRate":  22050,
+                                                     "channels":  1,
+                                                     "bitsPerSample":  16
+                                                 }
+                                },
+                      "demos":  {
+                                    "demo_full_count_4_4":  {
+                                                                "text":  "one and two and three and four and",
+                                                                "rate":  8,
+                                                                "file":  "sprint/demos/demo_full_count_4_4.wav",
+                                                                "durationMs":  673,
+                                                                "originalMs":  1024.2,
+                                                                "leadingTrimMs":  36.6,
+                                                                "trailingTrimMs":  314.6,
+                                                                "sampleRate":  22050,
+                                                                "channels":  1,
+                                                                "bitsPerSample":  16
+                                                            },
+                                    "demo_count_in_4":  {
+                                                            "text":  "one two three four",
+                                                            "rate":  8,
+                                                            "file":  "sprint/demos/demo_count_in_4.wav",
+                                                            "durationMs":  451.9,
+                                                            "originalMs":  789.3,
+                                                            "leadingTrimMs":  36.6,
+                                                            "trailingTrimMs":  300.8,
+                                                            "sampleRate":  22050,
+                                                            "channels":  1,
+                                                            "bitsPerSample":  16
+                                                        }
+                                }
+                  }
+              ]
+}

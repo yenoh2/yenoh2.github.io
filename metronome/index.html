@@ -26,14 +26,23 @@
                     <div class="bpm-label">BPM</div>
                 </div>
 
-                <!-- Time Sig -->
+                <!-- Time Sig + Voice Toggle -->
                 <div class="time-sig-container">
                     <label for="timeSignature">Time Sig</label>
-                    <select id="timeSignature">
-                        <option value="2">2/4</option>
-                        <option value="3">3/4</option>
-                        <option value="4" selected>4/4</option>
-                    </select>
+                    <div class="time-sig-row">
+                        <select id="timeSignature">
+                            <option value="2">2/4</option>
+                            <option value="3">3/4</option>
+                            <option value="4" selected>4/4</option>
+                        </select>
+                        <button id="spokenCountBtn" aria-label="Toggle Voice Count" class="voice-icon-btn off">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2a7 7 0 0 0-7 7v4a4 4 0 0 0 4 4h1a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1H9V9a3 3 0 1 1 6 0v2h-1a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h1a4 4 0 0 0 4-4V9a7 7 0 0 0-7-7z"/>
+                                <path class="voice-wave voice-wave-1" d="M3 9a9 9 0 0 0 0 6"/>
+                                <path class="voice-wave voice-wave-2" d="M1 7a11 11 0 0 0 0 10"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -64,7 +73,8 @@
             <div class="beat-indicators" id="beatIndicators">
                 <!-- Dynamically populated -->
             </div>
-        </div>
+
+            </div>
 
         <!-- Main Action (Play/Stop) -->
         <div class="main-controls">

@@ -99,7 +99,6 @@ body {
     grid-column: 3;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
     /* Align to right edge */
     justify-self: end;
 }
@@ -386,6 +385,51 @@ body {
 .beat-dot.active {
     background-color: var(--active-color);
     box-shadow: 0 0 20px var(--active-color);
+}
+
+/* Time Sig Row (select + voice icon) */
+.time-sig-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* Voice Icon Toggle Button */
+.voice-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--active-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.voice-icon-btn:hover {
+    background: rgba(255, 229, 146, 0.12);
+}
+
+.voice-icon-btn:active {
+    transform: scale(0.9);
+}
+
+.voice-icon-btn.off {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.voice-icon-btn.off:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.voice-icon-btn.off .voice-wave {
+    display: none;
 }
 
 /* Number Pad Overlay */
