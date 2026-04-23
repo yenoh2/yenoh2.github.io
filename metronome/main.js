@@ -89,7 +89,7 @@ function init() {
 let woodblockHighBuffer = null;
 let woodblockLowBuffer = null;
 
-async function unlockAudioContext() {
+function unlockAudioContext() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -101,11 +101,13 @@ async function unlockAudioContext() {
             woodblockLowBuffer = buffer;
         });
     }
+    // Fire-and-forget: do NOT await — awaiting resume() inside an async
+    // handler causes re-entrancy on iOS where the promise resolves late.
     if (audioCtx.state === 'suspended') {
-        await audioCtx.resume();
+        audioCtx.resume();
     }
-    // iOS Safari requires playing a silent buffer within a user gesture
-    // to fully unlock the AudioContext for future scheduled playback.
+    // iOS Safari requires playing a silent buffer within the user gesture
+    // to fully transition the AudioContext to the 'running' state.
     const silentBuf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
     const src = audioCtx.createBufferSource();
     src.buffer = silentBuf;
@@ -541,21 +543,50 @@ document.addEventListener('visibilitychange', async () => {
     } else if (document.visibilityState === 'visible' && isPlaying && audioCtx) {
         // iOS suspends AudioContext when backgrounded; re-resume it
         if (audioCtx.state === 'suspended') {
-            await audioCtx.resume();
+            audioCtx.resume();
         }
         requestWakeLock();
     }
 });
 
 async function togglePlay() {
-    if (isPreparingPlayback) {
+    // Synchronous unlock — must happen inside the user gesture, never awaited
+    unlockAudioContext();
+
+    // --- STOP path: always immediate, no async work ---
+    if (isPlaying) {
+        isPlaying = false;
+        playButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="80" height="80"><path d="M8 5v14l11-7z"/></svg>`;
+        playButton.classList.remove('playing');
+        releaseWakeLock();
+        resetVisuals();
         return;
     }
 
-    await unlockAudioContext();
+    // --- START path: guard against re-entrancy BEFORE any await ---
+    if (isPreparingPlayback) {
+        return;
+    }
+    isPreparingPlayback = true;
 
-    if (!isPlaying) {
-        isPreparingPlayback = true;
+    try {
+        // Wait for AudioContext to reach 'running' state (iOS may take a moment)
+        if (audioCtx.state !== 'running') {
+            await new Promise(resolve => {
+                const onRunning = () => {
+                    if (audioCtx.state === 'running') {
+                        audioCtx.removeEventListener('statechange', onRunning);
+                        resolve();
+                    }
+                };
+                audioCtx.addEventListener('statechange', onRunning);
+                // Safety timeout so we never hang indefinitely
+                setTimeout(() => {
+                    audioCtx.removeEventListener('statechange', onRunning);
+                    resolve();
+                }, 500);
+            });
+        }
 
         // Wait for woodblock buffers to be ready (critical on first play)
         if (!woodblockHighBuffer || !woodblockLowBuffer) {
@@ -577,19 +608,14 @@ async function togglePlay() {
             }
         }
 
-        isPreparingPlayback = false;
         isPlaying = true;
         restartTransportCycle();
         playButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="80" height="80"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
         playButton.classList.add('playing');
         requestWakeLock();
         scheduler();
-    } else {
-        isPlaying = false;
-        playButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="80" height="80"><path d="M8 5v14l11-7z"/></svg>`;
-        playButton.classList.remove('playing');
-        releaseWakeLock();
-        resetVisuals();
+    } finally {
+        isPreparingPlayback = false;
     }
 }
 
