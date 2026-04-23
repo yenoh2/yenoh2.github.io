@@ -89,7 +89,7 @@ function init() {
 let woodblockHighBuffer = null;
 let woodblockLowBuffer = null;
 
-function unlockAudioContext() {
+async function unlockAudioContext() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -102,8 +102,15 @@ function unlockAudioContext() {
         });
     }
     if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
+        await audioCtx.resume();
     }
+    // iOS Safari requires playing a silent buffer within a user gesture
+    // to fully unlock the AudioContext for future scheduled playback.
+    const silentBuf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+    const src = audioCtx.createBufferSource();
+    src.buffer = silentBuf;
+    src.connect(audioCtx.destination);
+    src.start(0);
 }
 
 // Render sound using OfflineAudioContext (The "Baking" process)
@@ -527,10 +534,16 @@ async function releaseWakeLock() {
     }
 }
 
-// Handle visibility change
+// Handle visibility change — re-unlock AudioContext on iOS when returning to foreground
 document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'hidden') {
         await releaseWakeLock();
+    } else if (document.visibilityState === 'visible' && isPlaying && audioCtx) {
+        // iOS suspends AudioContext when backgrounded; re-resume it
+        if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
+        requestWakeLock();
     }
 });
 
@@ -539,10 +552,22 @@ async function togglePlay() {
         return;
     }
 
-    unlockAudioContext();
+    await unlockAudioContext();
 
     if (!isPlaying) {
         isPreparingPlayback = true;
+
+        // Wait for woodblock buffers to be ready (critical on first play)
+        if (!woodblockHighBuffer || !woodblockLowBuffer) {
+            const timeout = new Promise(resolve => setTimeout(resolve, 500));
+            await Promise.race([
+                Promise.all([
+                    woodblockHighBuffer || renderOfflineWoodblock(1200).then(b => { woodblockHighBuffer = b; }),
+                    woodblockLowBuffer  || renderOfflineWoodblock(800).then(b => { woodblockLowBuffer = b; })
+                ]),
+                timeout
+            ]);
+        }
 
         if (spokenCountEnabled) {
             try {
