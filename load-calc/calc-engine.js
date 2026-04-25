@@ -234,11 +234,9 @@ export function calcColdFloor(length, width, warmFloorPct, floorInsulation, temp
 
 /**
  * Calculate window crack length for infiltration heating.
- * Fixed windows: (W + H) × qty  (frame perimeter = one W + one H since it's fixed)
- * Sliding windows: (W + 2H) × qty (operable sash)
  * The spreadsheet formula:
- *   Fixed (type=2): (W×2 + H×2) × qty
- *   Sliding (type=1): (W + 2×H) × qty
+ *   Fixed style: fixed crack = (W*2 + H*2) * qty
+ *   Sliding style: fixed/base crack = (W + H) * qty, sliding crack = (W + 2H) * qty
  */
 export function calcWindowCrackLength(windows) {
   let fixed = 0;
@@ -249,7 +247,8 @@ export function calcWindowCrackLength(windows) {
       // Fixed: full perimeter crack
       fixed += (w.width * 2 + w.height * 2) * w.qty;
     } else {
-      // Sliding: W + 2H per unit
+      // Sliding windows also carry the base crack length used by LOSSGAIN row 45.
+      fixed += (w.width + w.height) * w.qty;
       sliding += (w.width + 2 * w.height) * w.qty;
     }
   }
