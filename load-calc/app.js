@@ -5,6 +5,7 @@
 
 import * as C from './constants.js';
 import { calculateBuildingTotals } from './calc-engine.js';
+import * as proposal from './proposal-app.js';
 
 // ─── State ──────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ const state = {
   project: {
     customerName: '',
     customerAddress: '',
+    customerPhone: '',
     projectDate: new Date().toISOString().split('T')[0],
     summerOutside: 100,
     summerInside: 75,
@@ -61,7 +63,7 @@ state.rooms.push(createDefaultRoom('Entry'));
 // ─── Step Navigation ────────────────────────────────────────
 
 function goToStep(step) {
-  if (step < 1 || step > 4) return;
+  if (step < 1 || step > 6) return;
 
   // Save current form data before navigating away
   if (state.currentStep === 1) readProjectForm();
@@ -84,6 +86,14 @@ function goToStep(step) {
   // Render step-specific content
   if (step === 3) renderRoomEditor();
   if (step === 4) renderResults();
+  if (step === 5) {
+    const results = getLoadResults();
+    proposal.renderEquipmentBuilder(results);
+  }
+  if (step === 6) {
+    const results = getLoadResults();
+    proposal.renderProposalPreview(results);
+  }
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -93,6 +103,7 @@ function goToStep(step) {
 function readProjectForm() {
   state.project.customerName = document.getElementById('customerName').value;
   state.project.customerAddress = document.getElementById('customerAddress').value;
+  state.project.customerPhone = document.getElementById('customerPhone')?.value || '';
   state.project.projectDate = document.getElementById('projectDate').value;
   state.project.summerOutside = parseFloat(document.getElementById('summerOutside').value) || 100;
   state.project.summerInside = parseFloat(document.getElementById('summerInside').value) || 75;
@@ -238,8 +249,8 @@ function renderRoomForm() {
           <select id="ductConfig">
             <option value="ductLoss" ${room.ductConfig === 'ductLoss' ? 'selected' : ''}>Duct Loss</option>
             <option value="noDuctLoss" ${room.ductConfig === 'noDuctLoss' ? 'selected' : ''}>No Duct Loss</option>
-            <option value="off" ${room.ductConfig === 'off' ? 'selected' : ''}>Off</option>
-            <option value="boost" ${room.ductConfig === 'boost' ? 'selected' : ''}>Boost</option>
+            <option value="basement" ${room.ductConfig === 'basement' ? 'selected' : ''}>Basement</option>
+            <option value="attic" ${room.ductConfig === 'attic' ? 'selected' : ''}>Attic</option>
           </select>
         </div>
       </div>
@@ -447,6 +458,34 @@ function renderResults() {
   document.getElementById('roomResultsGrid').innerHTML = roomCards;
 }
 
+// ─── Load Results Helper ────────────────────────────────────
+
+function getLoadResults() {
+  readProjectForm();
+  readConfigForm();
+  if (document.getElementById('roomName')) readCurrentRoomForm();
+  const results = calculateBuildingTotals(state.rooms, state.config);
+  window._lastLoadResults = results;
+  window._appState = state;
+  return results;
+}
+
+// ─── Settings Modal ─────────────────────────────────────────
+
+function openSettings() {
+  proposal.renderSettings();
+  document.getElementById('settingsModal').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+function saveSettings() {
+  proposal.saveSettings();
+  closeSettings();
+}
+
 // ─── Init & Export ──────────────────────────────────────────
 
 function init() {
@@ -457,9 +496,16 @@ function init() {
   document.querySelectorAll('.step-dot').forEach(dot => {
     dot.addEventListener('click', () => goToStep(parseInt(dot.dataset.step)));
   });
+
+  // Pre-load equipment catalog
+  proposal.init();
 }
 
 // Expose to global for onclick handlers in HTML
-window.app = { goToStep, addRoom, removeRoom, switchRoom };
+window.app = {
+  goToStep, addRoom, removeRoom, switchRoom,
+  openSettings, closeSettings, saveSettings,
+  proposal,
+};
 
 init();

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="HVAC residential heating and cooling load calculator — Manual J-style BTU computation for up to 19 rooms.">
-  <title>HVAC Load Calculator</title>
+  <meta name="description" content="HVAC residential heating and cooling load calculator with proposal builder — Manual J-style BTU computation and equipment bid generation.">
+  <title>HVAC Load Calculator & Bid Builder</title>
   <link rel="stylesheet" href="index.css">
 </head>
 <body>
@@ -12,7 +12,8 @@
     <!-- ─── Header ─── -->
     <header class="app-header">
       <h1>HVAC Load Calculator</h1>
-      <p>Residential heating &amp; cooling load analysis</p>
+      <p>Residential heating &amp; cooling load analysis &amp; bid builder</p>
+      <button class="btn-icon settings-btn" onclick="app.openSettings()" title="Company Profile & Catalog">⚙️</button>
     </header>
 
     <!-- ─── Step Indicator ─── -->
@@ -28,6 +29,12 @@
       </div>
       <div class="step-dot" data-step="4">
         <span class="step-num">4</span><span>Results</span>
+      </div>
+      <div class="step-dot" data-step="5">
+        <span class="step-num">5</span><span>Equipment</span>
+      </div>
+      <div class="step-dot" data-step="6">
+        <span class="step-num">6</span><span>Proposal</span>
       </div>
     </nav>
 
@@ -49,6 +56,10 @@
           <div class="form-group" style="grid-column: 1 / -1;">
             <label for="customerAddress">Address</label>
             <input type="text" id="customerAddress" placeholder="e.g. 123 Main St, Salt Lake City, UT">
+          </div>
+          <div class="form-group">
+            <label for="customerPhone">Phone</label>
+            <input type="tel" id="customerPhone" placeholder="e.g. (801) 555-0123">
           </div>
         </div>
       </div>
@@ -172,9 +183,56 @@
 
       <div class="btn-group mt-lg">
         <button class="btn btn-secondary" onclick="app.goToStep(3)">← Edit Rooms</button>
-        <button class="btn btn-primary" onclick="window.print()">🖨️ Print Report</button>
+        <button class="btn btn-primary" onclick="app.goToStep(5)">Next → Equipment & Pricing</button>
       </div>
     </section>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- STEP 5: Equipment & Pricing                            -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <section class="step-panel" id="step5">
+      <div id="equipmentBuilder">
+        <!-- Dynamically rendered by proposal-app.js -->
+      </div>
+
+      <div class="btn-group mt-lg">
+        <button class="btn btn-secondary" onclick="app.goToStep(4)">← Back to Results</button>
+        <button class="btn btn-primary" onclick="app.goToStep(6)">Generate Proposal →</button>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- STEP 6: Proposal Preview                               -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <section class="step-panel" id="step6">
+      <div id="proposalPreview">
+        <!-- Dynamically rendered by proposal-app.js -->
+      </div>
+
+      <div class="btn-group mt-lg no-print">
+        <button class="btn btn-secondary" onclick="app.goToStep(5)">← Edit Equipment</button>
+        <button class="btn btn-primary" onclick="window.print()">🖨️ Print Proposal</button>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- MODAL: Settings / Company Profile / Catalog Manager     -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="modal-overlay" id="settingsModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>⚙️ Settings</h2>
+          <button class="btn-icon" onclick="app.closeSettings()">✕</button>
+        </div>
+        <div class="modal-body" id="settingsBody">
+          <!-- Dynamically rendered -->
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="app.closeSettings()">Cancel</button>
+          <button class="btn btn-primary" onclick="app.saveSettings()">Save</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="app.js"></script>
