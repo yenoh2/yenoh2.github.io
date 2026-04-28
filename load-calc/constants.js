@@ -59,12 +59,31 @@ export const INTERNAL_GAINS = {
   personBTU: 350,
 };
 
+/** Common units for manual gain/loss load adders. The unit field is still free-form. */
+export const ADDITIONAL_LOAD_UNITS = [
+  'sq ft',
+  'linear ft',
+  'each',
+  'fixture',
+  'lamp',
+  'person',
+  'appliance',
+  'equipment item',
+  'W',
+  'kW',
+  'ton',
+  'motor hp',
+  'CFM',
+  'room',
+  'total',
+];
+
 /** Total sensible multiplier by duct configuration */
 export const TOTAL_SENSIBLE_MULTIPLIER = {
   ductLoss: 1.58,
   noDuctLoss: 1.38,
-  off: 0,
-  boost: 1.78,
+  basement: 0,
+  attic: 1.78,
 };
 
 // ═══════════════════════════════════════════════════════════════

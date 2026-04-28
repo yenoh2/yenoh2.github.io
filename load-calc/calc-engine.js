@@ -84,6 +84,36 @@ export function calcInfiltrationCooling(exposedWallArea, roomType) {
 }
 
 /**
+ * Calculate user-entered gain/loss load adders.
+ * Formula: quantity x unitLoad.
+ */
+export function calcLoadAdjustments(adjustments, type) {
+  let total = 0;
+  const items = [];
+
+  for (const adj of adjustments || []) {
+    if (!adj || adj.type !== type) continue;
+
+    const quantity = Number(adj.quantity) || 0;
+    const unitLoad = Number(adj.unitLoad) || 0;
+    const itemTotal = quantity * unitLoad;
+
+    if (!isFinite(itemTotal) || itemTotal === 0) continue;
+
+    total += itemTotal;
+    items.push({
+      label: adj.label || 'Additional Load',
+      quantity,
+      unit: adj.unit || 'each',
+      unitLoad,
+      total: itemTotal,
+    });
+  }
+
+  return { total, items };
+}
+
+/**
  * Calculate total window+door area for a room (used in net wall calc and heating).
  */
 export function calcTotalWindowDoorArea(windows, doors) {
@@ -136,10 +166,11 @@ export function calculateRoomCooling(room, config) {
   const netWall = calcNetWallCooling(exposedWallArea, windowDoorArea, config.wallInsulation, roomType);
   const internalGains = calcInternalGains(applianceCount, peopleCount);
   const infiltration = calcInfiltrationCooling(exposedWallArea, roomType);
+  const adjustmentCalc = calcLoadAdjustments(room.adjustments, 'gain');
 
   const subtotal = windowGain + doorGain + warmCeiling + warmFloor + netWall + internalGains + infiltration;
   const totalSensibleMult = C.TOTAL_SENSIBLE_MULTIPLIER[ductConfig] || 0;
-  const total = subtotal * totalSensibleMult;
+  const total = Math.max(0, subtotal * totalSensibleMult + adjustmentCalc.total);
 
   return {
     windowGain,
@@ -149,6 +180,8 @@ export function calculateRoomCooling(room, config) {
     netWall,
     internalGains,
     infiltration,
+    additionalLoads: adjustmentCalc.total,
+    adjustmentItems: adjustmentCalc.items,
     subtotal,
     totalSensibleMult,
     total,
@@ -296,8 +329,9 @@ export function calculateRoomHeating(room, config) {
   const coldCeiling = calcColdCeiling(length, width, ceilingType, ceilingInsulation, config.tempMode, roomType);
   const coldFloor = calcColdFloor(length, width, warmFloorPct, config.floorInsulation, config.tempMode, roomType);
   const infiltration = calcInfiltrationHeating(windows, doors, config.tempMode);
+  const adjustmentCalc = calcLoadAdjustments(room.adjustments, 'loss');
 
-  const total = windowLoss + doorLoss + netWall + coldCeiling + coldFloor + infiltration;
+  const total = Math.max(0, windowLoss + doorLoss + netWall + coldCeiling + coldFloor + infiltration + adjustmentCalc.total);
 
   return {
     windowLoss,
@@ -306,6 +340,8 @@ export function calculateRoomHeating(room, config) {
     coldCeiling,
     coldFloor,
     infiltration,
+    additionalLoads: adjustmentCalc.total,
+    adjustmentItems: adjustmentCalc.items,
     total,
   };
 }

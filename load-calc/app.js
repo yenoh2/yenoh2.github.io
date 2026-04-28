@@ -54,6 +54,17 @@ function createDefaultRoom(name) {
     warmFloorPct: 0,
     applianceCount: 0,
     peopleCount: 0,
+    adjustments: [],
+  };
+}
+
+function createDefaultAdjustment() {
+  return {
+    label: '',
+    type: 'gain',
+    quantity: 0,
+    unit: 'sq ft',
+    unitLoad: 0,
   };
 }
 
@@ -152,6 +163,17 @@ function readCurrentRoomForm() {
   room.doors.qty = parseInt(document.getElementById('doorQty').value) || 0;
   room.doors.width = parseFloat(document.getElementById('doorW').value) || 0;
   room.doors.height = parseFloat(document.getElementById('doorH').value) || 0;
+
+  // Additional gain/loss loads
+  room.adjustments = Array.from(editor.querySelectorAll('.adjustment-entry')).map((row, i) => {
+    const label = document.getElementById(`adjLabel${i}`)?.value.trim() || '';
+    const type = document.getElementById(`adjType${i}`)?.value || 'gain';
+    const quantity = parseFloat(document.getElementById(`adjQty${i}`)?.value) || 0;
+    const unit = document.getElementById(`adjUnit${i}`)?.value.trim() || 'each';
+    const unitLoad = parseFloat(document.getElementById(`adjUnitLoad${i}`)?.value) || 0;
+
+    return { label, type, quantity, unit, unitLoad };
+  }).filter(adj => adj.label || adj.quantity !== 0 || adj.unitLoad !== 0);
 }
 
 // ─── Room Editor Rendering ──────────────────────────────────
@@ -196,6 +218,35 @@ function renderRoomForm() {
       <span></span>
     </div>
   `).join('');
+
+  const hasAdjustments = Array.isArray(room.adjustments) && room.adjustments.length > 0;
+  const adjustmentRows = (hasAdjustments ? room.adjustments : [createDefaultAdjustment()]).map((adj, i) => {
+    const quantity = Number(adj.quantity) || 0;
+    const unitLoad = Number(adj.unitLoad) || 0;
+    const total = quantity * unitLoad;
+    const removeButton = hasAdjustments
+      ? `<button type="button" class="adjustment-remove" onclick="app.removeAdjustment(${i})" title="Remove load">x</button>`
+      : '<span></span>';
+
+    return `
+      <div class="adjustment-entry">
+        <input type="text" id="adjLabel${i}" value="${escapeHTML(adj.label || '')}" placeholder="Lighting, copier, server">
+        <select id="adjType${i}">
+          <option value="gain" ${adj.type === 'gain' ? 'selected' : ''}>Gain</option>
+          <option value="loss" ${adj.type === 'loss' ? 'selected' : ''}>Loss</option>
+        </select>
+        <input type="number" id="adjQty${i}" value="${quantity || ''}" placeholder="0" step="0.01" min="0" oninput="app.updateAdjustmentPreview(${i})">
+        <div class="unit-combo" onclick="event.stopPropagation()">
+          <input type="text" id="adjUnit${i}" value="${escapeHTML(adj.unit || '')}" placeholder="Pick or type" autocomplete="off" onfocus="app.openUnitMenu(${i}, true)" oninput="app.filterUnitMenu(${i})">
+          <button type="button" class="unit-combo-toggle" onclick="app.toggleUnitMenu(${i})" title="Show unit choices">v</button>
+          <div class="unit-menu" id="adjUnitMenu${i}">${renderUnitMenuOptions(i)}</div>
+        </div>
+        <input type="number" id="adjUnitLoad${i}" value="${unitLoad || ''}" placeholder="BTU/hr per unit" step="0.01" oninput="app.updateAdjustmentPreview(${i})">
+        <span class="adjustment-total" id="adjTotal${i}">${formatBTU(total)}</span>
+        ${removeButton}
+      </div>
+    `;
+  }).join('');
 
   const html = `
     <div class="card">
@@ -299,6 +350,15 @@ function renderRoomForm() {
         </div>
       </div>
     </div>
+
+    <div class="card">
+      <div class="card-title">Additional Loads</div>
+      <div class="adjustment-entry-header">
+        <span>Label</span><span>Applies</span><span>Qty</span><span>Unit</span><span>BTU/hr/Unit</span><span>Total</span><span></span>
+      </div>
+      <div class="adjustment-entries">${adjustmentRows}</div>
+      <button type="button" class="room-tab-add adjustment-add" onclick="app.addAdjustment()">+ Add Load</button>
+    </div>
   `;
 
   document.getElementById('roomEditor').innerHTML = html;
@@ -307,6 +367,12 @@ function renderRoomForm() {
 function renderRoomEditor() {
   renderRoomTabs();
   renderRoomForm();
+}
+
+function renderUnitMenuOptions(index) {
+  return C.ADDITIONAL_LOAD_UNITS.map(unit => `
+    <button type="button" class="unit-option" data-unit="${escapeHTML(unit)}" onclick="app.selectAdjustmentUnit(${index}, this.dataset.unit)">${escapeHTML(unit)}</button>
+  `).join('');
 }
 
 // ─── Room Management ────────────────────────────────────────
@@ -338,6 +404,87 @@ function switchRoom(index) {
 }
 
 // ─── Results Rendering ──────────────────────────────────────
+
+function addAdjustment() {
+  readCurrentRoomForm();
+  const room = state.rooms[state.activeRoomIndex];
+  if (!room) return;
+  if (!Array.isArray(room.adjustments)) room.adjustments = [];
+  room.adjustments.push(createDefaultAdjustment());
+  renderRoomEditor();
+}
+
+function removeAdjustment(index) {
+  readCurrentRoomForm();
+  const room = state.rooms[state.activeRoomIndex];
+  if (!room || !Array.isArray(room.adjustments)) return;
+  room.adjustments.splice(index, 1);
+  renderRoomEditor();
+}
+
+function updateAdjustmentPreview(index) {
+  const qty = parseFloat(document.getElementById(`adjQty${index}`)?.value) || 0;
+  const unitLoad = parseFloat(document.getElementById(`adjUnitLoad${index}`)?.value) || 0;
+  const totalEl = document.getElementById(`adjTotal${index}`);
+  if (totalEl) totalEl.textContent = formatBTU(qty * unitLoad);
+}
+
+function openUnitMenu(index, showAll = false) {
+  closeUnitMenus(index);
+  const menu = document.getElementById(`adjUnitMenu${index}`);
+  if (!menu) return;
+  menu.classList.add('open');
+  filterUnitMenu(index, showAll);
+}
+
+function toggleUnitMenu(index) {
+  const menu = document.getElementById(`adjUnitMenu${index}`);
+  if (!menu) return;
+  if (menu.classList.contains('open')) {
+    menu.classList.remove('open');
+  } else {
+    openUnitMenu(index, true);
+  }
+}
+
+function filterUnitMenu(index, showAll = false) {
+  const input = document.getElementById(`adjUnit${index}`);
+  const menu = document.getElementById(`adjUnitMenu${index}`);
+  if (!input || !menu) return;
+
+  const query = showAll ? '' : input.value.trim().toLowerCase();
+  let visibleCount = 0;
+  menu.querySelectorAll('.unit-option').forEach(option => {
+    const matches = !query || option.dataset.unit.toLowerCase().includes(query);
+    option.hidden = !matches;
+    if (matches) visibleCount += 1;
+  });
+  menu.classList.toggle('empty', visibleCount === 0);
+}
+
+function selectAdjustmentUnit(index, unit) {
+  const input = document.getElementById(`adjUnit${index}`);
+  const menu = document.getElementById(`adjUnitMenu${index}`);
+  if (input) input.value = unit;
+  if (menu) menu.classList.remove('open');
+}
+
+function closeUnitMenus(exceptIndex = null) {
+  document.querySelectorAll('.unit-menu.open').forEach(menu => {
+    if (exceptIndex !== null && menu.id === `adjUnitMenu${exceptIndex}`) return;
+    menu.classList.remove('open');
+  });
+}
+
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[char]));
+}
 
 function formatBTU(value) {
   if (!value || !isFinite(value)) return '0';
@@ -387,7 +534,11 @@ function renderResults() {
       { name: 'Net Wall', value: cool.netWall },
       { name: 'Internal', value: cool.internalGains },
       { name: 'Infiltration', value: cool.infiltration },
-    ].filter(b => b.value > 0);
+      ...(cool.adjustmentItems || []).map(item => ({
+        name: item.label ? `Adj: ${item.label}` : 'Additional Load',
+        value: item.total,
+      })),
+    ].filter(b => b.value !== 0);
 
     const heatBreakdown = [
       { name: 'Windows', value: heat.windowLoss },
@@ -396,10 +547,14 @@ function renderResults() {
       { name: 'Ceiling', value: heat.coldCeiling },
       { name: 'Floor', value: heat.coldFloor },
       { name: 'Infiltration', value: heat.infiltration },
-    ].filter(b => b.value > 0);
+      ...(heat.adjustmentItems || []).map(item => ({
+        name: item.label ? `Adj: ${item.label}` : 'Additional Load',
+        value: item.total,
+      })),
+    ].filter(b => b.value !== 0);
 
-    const maxCoolComponent = Math.max(...coolBreakdown.map(b => b.value), 1);
-    const maxHeatComponent = Math.max(...heatBreakdown.map(b => b.value), 1);
+    const maxCoolComponent = Math.max(...coolBreakdown.map(b => Math.abs(b.value)), 1);
+    const maxHeatComponent = Math.max(...heatBreakdown.map(b => Math.abs(b.value)), 1);
 
     return `
       <div class="room-result-card">
@@ -422,10 +577,10 @@ function renderResults() {
           <div class="breakdown-list">
             ${coolBreakdown.map(b => `
               <div class="breakdown-item">
-                <span class="breakdown-name">${b.name}</span>
+                <span class="breakdown-name">${escapeHTML(b.name)}</span>
                 <span class="breakdown-value">${formatBTU(b.value)}</span>
                 <div class="breakdown-bar-bg">
-                  <div class="breakdown-bar cool" style="width: ${(b.value / maxCoolComponent * 100).toFixed(1)}%"></div>
+                  <div class="breakdown-bar cool" style="width: ${(Math.abs(b.value) / maxCoolComponent * 100).toFixed(1)}%"></div>
                 </div>
               </div>
             `).join('')}
@@ -436,10 +591,10 @@ function renderResults() {
           <div class="breakdown-list">
             ${heatBreakdown.map(b => `
               <div class="breakdown-item">
-                <span class="breakdown-name">${b.name}</span>
+                <span class="breakdown-name">${escapeHTML(b.name)}</span>
                 <span class="breakdown-value">${formatBTU(b.value)}</span>
                 <div class="breakdown-bar-bg">
-                  <div class="breakdown-bar heat" style="width: ${(b.value / maxHeatComponent * 100).toFixed(1)}%"></div>
+                  <div class="breakdown-bar heat" style="width: ${(Math.abs(b.value) / maxHeatComponent * 100).toFixed(1)}%"></div>
                 </div>
               </div>
             `).join('')}
@@ -496,6 +651,7 @@ function init() {
   document.querySelectorAll('.step-dot').forEach(dot => {
     dot.addEventListener('click', () => goToStep(parseInt(dot.dataset.step)));
   });
+  document.addEventListener('click', () => closeUnitMenus());
 
   // Pre-load equipment catalog
   proposal.init();
@@ -504,6 +660,8 @@ function init() {
 // Expose to global for onclick handlers in HTML
 window.app = {
   goToStep, addRoom, removeRoom, switchRoom,
+  addAdjustment, removeAdjustment, updateAdjustmentPreview,
+  openUnitMenu, toggleUnitMenu, filterUnitMenu, selectAdjustmentUnit,
   openSettings, closeSettings, saveSettings,
   proposal,
 };

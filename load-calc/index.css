@@ -392,6 +392,149 @@ body::before {
 }
 
 /* ─── Section Divider ────────────────────────────────────── */
+.adjustment-entries { margin-top: var(--space-md); }
+
+.adjustment-entry,
+.adjustment-entry-header {
+  display: grid;
+  grid-template-columns: minmax(160px, 2fr) 95px minmax(70px, 0.7fr) minmax(105px, 1fr) minmax(115px, 1fr) 90px 32px;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.adjustment-entry {
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border-glass);
+}
+.adjustment-entry:last-child { border-bottom: none; }
+
+.adjustment-entry input,
+.adjustment-entry select {
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.5rem;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8rem;
+  outline: none;
+  width: 100%;
+  transition: border-color var(--transition-fast);
+}
+.adjustment-entry input:focus,
+.adjustment-entry select:focus {
+  border-color: var(--cool-start);
+}
+
+.adjustment-entry select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  padding-right: 1.5rem;
+}
+
+.unit-combo {
+  position: relative;
+  width: 100%;
+}
+
+.unit-combo input {
+  padding-right: 2rem;
+}
+
+.unit-combo-toggle {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  right: 1px;
+  width: 28px;
+  border: 0;
+  border-left: 1px solid var(--border-input);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.unit-combo-toggle:hover {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.08);
+}
+
+.unit-menu {
+  display: none;
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: var(--space-xs);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  box-shadow: var(--shadow-md);
+}
+.unit-menu.open { display: grid; gap: 2px; }
+.unit-menu.empty::after {
+  content: 'Type custom unit';
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 0.45rem 0.5rem;
+}
+
+.unit-option {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.45rem 0.5rem;
+  text-align: left;
+}
+.unit-option:hover {
+  background: rgba(59,130,246,0.12);
+  color: var(--text-primary);
+}
+
+.adjustment-entry-header {
+  padding: 0 0 var(--space-xs) 0;
+}
+.adjustment-entry-header span {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.adjustment-total {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.adjustment-remove {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(239,68,68,0.25);
+  background: rgba(239,68,68,0.08);
+  color: var(--danger);
+  cursor: pointer;
+  font-weight: 700;
+  transition: background var(--transition-fast);
+}
+.adjustment-remove:hover { background: rgba(239,68,68,0.18); }
+
+.adjustment-add { margin-top: var(--space-sm); }
+
 .section-divider {
   border: none;
   border-top: 1px solid var(--border-glass);
@@ -602,7 +745,14 @@ body::before {
   padding: 3px 0;
   font-size: 0.75rem;
 }
-.breakdown-name { flex: 1; color: var(--text-secondary); }
+.breakdown-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .breakdown-value { font-weight: 600; min-width: 70px; text-align: right; }
 .breakdown-bar-bg {
   width: 60px;
@@ -648,6 +798,13 @@ body::before {
   }
   .window-entry-header { display: none; }
   .window-entry-label { grid-column: 1 / -1; }
+  .adjustment-entry {
+    grid-template-columns: 1fr 1fr;
+    align-items: end;
+  }
+  .adjustment-entry-header { display: none; }
+  .adjustment-entry input:first-child { grid-column: 1 / -1; }
+  .adjustment-total { text-align: left; }
   .summary-value { font-size: 1.6rem; }
   .card { padding: var(--space-lg); }
   .step-dot span:not(.step-num) { display: none; }
