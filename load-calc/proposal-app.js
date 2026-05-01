@@ -5,7 +5,11 @@
 import * as PC from './proposal-constants.js';
 import * as PE from './proposal-engine.js';
 import * as picker from './catalog-picker.js';
-import { createMaterialsState } from './materials-data.js';
+import {
+  createMaterialsState, DUCT_MATERIAL_TYPES,
+  calculateDuctTypeSqft, calculateDuctRunSqft,
+  createDuctRun, MAX_DUCT_ROWS,
+} from './materials-data.js';
 
 const proposalState = {
   saleType: 'furnaceAndAC',
@@ -18,6 +22,8 @@ const proposalState = {
   selectedOption: 0,
   settingsTab: 'profile',
 };
+
+let materialsRenderTimer = null;
 
 function createDefaultOption(num) {
   return {
@@ -74,7 +80,7 @@ export function renderEquipmentBuilder(loadResults) {
       onclick="app.proposal.selectOption(${idx})">${esc(opt.label || `Option ${idx + 1}`)}</button>
   `).join('');
 
-  let html = `
+  const setupHTML = `
     <div class="card proposal-workflow-card">
       <div class="card-title">Proposal Setup</div>
       <div class="proposal-setup-grid">
@@ -107,22 +113,28 @@ export function renderEquipmentBuilder(loadResults) {
         </div>
       </div>
     </div>
-
-    <div class="card">
-      <div class="card-title">Customer Options</div>
-      <div class="options-grid proposal-options-builder">
   `;
 
+  let optionsHTML = '<div class="card"><div class="card-title">Customer Options</div><div class="options-grid proposal-options-builder">';
   for (let i = 0; i < 3; i++) {
-    html += renderOptionColumn(i, loadResults);
+    optionsHTML += renderOptionColumn(i, loadResults);
   }
+  optionsHTML += '</div></div>';
 
-  html += `
-      </div>
-    </div>
-  `;
-
-  container.innerHTML = html;
+  // Use stable sub-containers so materials card isn't destroyed on every re-render
+  const setupWrap = container.querySelector('#eqSetup');
+  if (!setupWrap) {
+    // First render — create all three sections
+    container.innerHTML = `
+      <div id="eqSetup">${setupHTML}</div>
+      <div id="eqMaterials">${renderMaterialsCard()}</div>
+      <div id="eqOptions">${optionsHTML}</div>
+    `;
+  } else {
+    // Subsequent renders — only update setup and options, leave materials untouched
+    setupWrap.innerHTML = setupHTML;
+    container.querySelector('#eqOptions').innerHTML = optionsHTML;
+  }
 }
 
 function renderOptionColumn(optIdx, loadResults) {
@@ -677,6 +689,427 @@ export function clearOption(optIdx) {
 
 export { picker };
 
+// ═══════════════════════════════════════════════════════════════
+// MATERIALS & DUCT CALCULATOR
+// ═══════════════════════════════════════════════════════════════
+
+function getMaterialsTotals() {
+  const furnaceType = getFurnaceType(proposalState.options[proposalState.selectedOption]?.furnace);
+  return PE.calculateMaterialsTotal(proposalState.materials, furnaceType);
+}
+
+function renderMaterialsCard() {
+  const totals = getMaterialsTotals();
+  const grandTotal = totals.totalMaterials + totals.totalLabor;
+  const expanded = proposalState._materialsExpanded ? 'expanded' : '';
+
+  return `
+    <div class="card materials-card ${expanded}" id="materialsCard">
+      <div class="materials-summary-bar" onclick="app.proposal.toggleMaterialsCard()">
+        <div class="materials-summary-left">
+          <span class="icon">📦</span> Materials & Labor
+          <span class="materials-toggle-icon">▼</span>
+        </div>
+        <div class="materials-summary-totals">
+          <span class="materials-summary-chip">Materials <strong>$${fmt(totals.totalMaterials)}</strong></span>
+          <span class="materials-summary-chip">Labor <strong>$${fmt(totals.totalLabor)}</strong></span>
+          <span class="materials-summary-chip">Total <strong>$${fmt(grandTotal)}</strong></span>
+        </div>
+      </div>
+      <div class="materials-body">
+        <div class="materials-panels">
+          <div>
+            <div class="materials-panel-title">Furnace Materials</div>
+            ${renderMaterialTable('furnaceMaterials')}
+            ${renderFurnaceLaborSection()}
+            ${renderACLaborSection()}
+          </div>
+          <div>
+            <div class="materials-panel-title">A/C Materials</div>
+            ${renderMaterialTable('acMaterials')}
+            
+            <div class="materials-panel-title" style="margin-top: var(--space-lg);">General Materials</div>
+            ${renderMaterialTable('generalMaterials')}
+            
+            ${renderDuctCollapsible()}
+          </div>
+        </div>
+        ${renderMaterialsGrandTotals(totals)}
+      </div>
+    </div>
+  `;
+}
+
+function renderMaterialTable(stateKey) {
+  const items = proposalState.materials[stateKey];
+  let subtotal = 0;
+  const rows = items.map((item, idx) => {
+    const lineTotal = (item.qty || 0) * item.unitPrice;
+    subtotal += lineTotal;
+    const hasQty = item.qty > 0;
+    return `
+      <tr class="${hasQty ? 'has-qty' : ''}">
+        <td>${esc(item.name)}</td>
+        <td class="right"><input type="number" value="${item.qty || ''}" min="0" placeholder="0"
+          data-materials-focus-key="mat:${stateKey}:${idx}"
+          onchange="app.proposal.updateMaterialQty('${stateKey}', ${idx}, this.value)"></td>
+        <td class="right">$${item.unitPrice.toFixed(2)}</td>
+        <td class="right total-cell">${hasQty ? '$' + lineTotal.toFixed(2) : '—'}</td>
+      </tr>`;
+  }).join('');
+
+  // Add duct-computed read-only rows for generalMaterials
+  let ductRows = '';
+  if (stateKey === 'generalMaterials') {
+    const waste = proposalState.materials.ductWasteFactor || 0;
+    for (const dtype of DUCT_MATERIAL_TYPES) {
+      const runs = proposalState.materials.ductRuns?.[dtype.key] || [];
+      const { totalSqft } = calculateDuctTypeSqft(runs, waste);
+      const cost = totalSqft * dtype.pricePerSqft;
+      subtotal += cost;
+      const hasSqft = totalSqft > 0;
+      ductRows += `
+        <tr class="${hasSqft ? 'has-qty' : ''}">
+          <td class="mat-readonly">${esc(dtype.name)} (duct calc)</td>
+          <td class="right mat-readonly">${hasSqft ? totalSqft.toFixed(1) : '—'}</td>
+          <td class="right">$${dtype.pricePerSqft.toFixed(2)}/sqft</td>
+          <td class="right total-cell">${hasSqft ? '$' + cost.toFixed(2) : '—'}</td>
+        </tr>`;
+    }
+  }
+
+  return `
+    <div class="mat-scroll">
+      <table class="mat-table">
+        <thead><tr>
+          <th>Item</th><th class="right">Qty</th><th class="right">$/unit</th><th class="right">Total</th>
+        </tr></thead>
+        <tbody>
+          ${rows}
+          ${ductRows}
+        </tbody>
+      </table>
+    </div>
+    <div class="mat-subtotal-fixed">
+      <span>Subtotal</span>
+      <span>$${fmt(subtotal)}</span>
+    </div>`;
+}
+
+function renderFurnaceLaborSection() {
+  const labor = proposalState.materials.labor;
+  const rate = proposalState.materials.laborRate;
+  let total80 = 0, total90 = 0;
+  const rows = labor.map((cat, idx) => {
+    const isEquip = cat.name === 'Equipment';
+    const hrs80 = cat.hours80 || 0;
+    const hrs90 = isEquip ? (cat.hours90 || 0) : hrs80;
+    
+    total80 += hrs80;
+    total90 += hrs90;
+
+    const col90HTML = isEquip
+      ? `<input type="number" value="${cat.hours90 || ''}" min="0" placeholder="0" step="0.5" data-materials-focus-key="labor:${idx}:90" onchange="app.proposal.updateLaborHours(${idx}, '90', this.value)">`
+      : `<span class="mat-readonly" style="padding-right: 4px;">${hrs90 || '—'}</span>`;
+
+    return `
+      <tr>
+        <td>${esc(cat.name)}</td>
+        <td class="right"><input type="number" value="${cat.hours80 || ''}" min="0" placeholder="0" step="0.5"
+          data-materials-focus-key="labor:${idx}:80"
+          onchange="app.proposal.updateLaborHours(${idx}, '80', this.value)"></td>
+        <td class="right">${col90HTML}</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <div class="labor-section">
+      <div class="materials-panel-title">Furnace Labor</div>
+      <table class="labor-table">
+        <thead><tr><th>Task</th><th class="right">80% hrs</th><th class="right">90% hrs</th></tr></thead>
+        <tbody>
+          ${rows}
+          <tr class="labor-total-row">
+            <td>Total</td>
+            <td class="right">${total80}h → $${fmt(total80 * rate)}</td>
+            <td class="right">${total90}h → $${fmt(total90 * rate)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="labor-rate-row">
+        Rate: $<input type="number" value="${rate}" min="0" step="1"
+          data-materials-focus-key="labor:rate"
+          onchange="app.proposal.updateLaborRate(this.value)">/hr
+      </div>
+    </div>`;
+}
+
+function renderACLaborSection() {
+  const m = proposalState.materials;
+  const rate = m.laborRate;
+  const acCost = (m.acLaborHours || 0) * rate;
+  const genCost = (m.generalLaborHours || 0) * rate;
+
+  return `
+    <div class="labor-section">
+      <div class="materials-panel-title">A/C & General Labor</div>
+      <table class="labor-table">
+        <thead><tr><th>Task</th><th class="right">Hours</th><th class="right">Cost</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>A/C Labor</td>
+            <td class="right"><input type="number" value="${m.acLaborHours || ''}" min="0" placeholder="0" step="0.5"
+              data-materials-focus-key="labor:ac"
+              onchange="app.proposal.updateACLaborHours(this.value)"></td>
+            <td class="right">$${fmt(acCost)}</td>
+          </tr>
+          <tr>
+            <td>General Labor</td>
+            <td class="right"><input type="number" value="${m.generalLaborHours || ''}" min="0" placeholder="0" step="0.5"
+              data-materials-focus-key="labor:general"
+              onchange="app.proposal.updateGeneralLaborHours(this.value)"></td>
+            <td class="right">$${fmt(genCost)}</td>
+          </tr>
+          <tr class="labor-total-row">
+            <td>Total</td>
+            <td class="right">${(m.acLaborHours || 0) + (m.generalLaborHours || 0)}h</td>
+            <td class="right">$${fmt(acCost + genCost)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderDuctCollapsible() {
+  const m = proposalState.materials;
+  const waste = m.ductWasteFactor ?? 0.30;
+  const expanded = proposalState._ductCalcExpanded ? 'expanded' : '';
+
+  // Build summary chips
+  const summaryParts = DUCT_MATERIAL_TYPES.map(dtype => {
+    const runs = m.ductRuns?.[dtype.key] || [];
+    const { totalSqft } = calculateDuctTypeSqft(runs, waste);
+    const shortName = dtype.name.replace('Sheet Metal ', 'SM').replace('×', 'x');
+    return `<span class="duct-summary-chip${totalSqft > 0 ? ' has-data' : ''}">${shortName}: <strong>${totalSqft > 0 ? totalSqft.toFixed(1) + ' sqft' : '—'}</strong></span>`;
+  }).join('');
+
+  return `
+    <div class="duct-collapsible ${expanded}" style="margin-top: var(--space-lg);">
+      <div class="duct-collapsible-bar" onclick="app.proposal.toggleDuctCalc()">
+        <span class="duct-collapsible-label">📐 Duct Calculator <span class="materials-toggle-icon">▼</span></span>
+        <span class="duct-summary-chips">${summaryParts}</span>
+      </div>
+      <div class="duct-collapsible-body">
+        ${renderDuctCalculatorBody()}
+      </div>
+    </div>
+  `;
+}
+
+function renderDuctCalculatorBody() {
+  const m = proposalState.materials;
+  const waste = m.ductWasteFactor ?? 0.30;
+  const wastePercent = Math.round(waste * 100);
+
+  let html = `
+    <div class="duct-waste-row">
+      Waste factor:
+      <input type="number" value="${wastePercent}" min="0" max="100" step="1"
+        data-materials-focus-key="duct:waste"
+        onchange="app.proposal.updateDuctWaste(this.value)">%
+    </div>
+    <div class="duct-calc-section">`;
+
+  for (const dtype of DUCT_MATERIAL_TYPES) {
+    const runs = m.ductRuns?.[dtype.key] || [];
+    const { rawSqft, totalSqft } = calculateDuctTypeSqft(runs, waste);
+    const cost = totalSqft * dtype.pricePerSqft;
+
+    let runRows = runs.map((run, idx) => {
+      const sqft = calculateDuctRunSqft(run.length || 0, run.width || 0, run.height || 0);
+      const hasData = sqft > 0;
+      return `
+        <tr class="${hasData ? 'has-data' : ''}">
+          <td>${idx + 1}</td>
+          <td><input type="number" value="${run.length || ''}" min="0" placeholder="0" step="0.5"
+            data-materials-focus-key="duct:${dtype.key}:${idx}:length"
+            onchange="app.proposal.updateDuctRun('${dtype.key}', ${idx}, 'length', this.value)"></td>
+          <td><input type="number" value="${run.width || ''}" min="0" placeholder="0" step="0.5"
+            data-materials-focus-key="duct:${dtype.key}:${idx}:width"
+            onchange="app.proposal.updateDuctRun('${dtype.key}', ${idx}, 'width', this.value)"></td>
+          <td><input type="number" value="${run.height || ''}" min="0" placeholder="0" step="0.5"
+            data-materials-focus-key="duct:${dtype.key}:${idx}:height"
+            onchange="app.proposal.updateDuctRun('${dtype.key}', ${idx}, 'height', this.value)"></td>
+          <td>${hasData ? sqft.toFixed(1) : '—'}</td>
+        </tr>`;
+    }).join('');
+
+    const canAdd = runs.length < MAX_DUCT_ROWS;
+
+    html += `
+      <div class="duct-type-block">
+        <div class="duct-type-label">${esc(dtype.name)}</div>
+        <table class="duct-table">
+          <thead><tr><th>#</th><th>L(ft)</th><th>W(in)</th><th>H(in)</th><th>sqft</th></tr></thead>
+          <tbody>
+            ${runRows}
+            <tr class="duct-subtotal-row">
+              <td colspan="4">Subtotal: ${rawSqft.toFixed(1)} + ${wastePercent}% = ${totalSqft.toFixed(1)} sqft</td>
+              <td>$${cost.toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <button type="button" class="duct-add-row" ${canAdd ? '' : 'disabled'}
+          onclick="app.proposal.addDuctRow('${dtype.key}')">+ Add row</button>
+      </div>`;
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function renderMaterialsGrandTotals(totals) {
+  const grandTotal = totals.totalMaterials + totals.totalLabor;
+  return `
+    <div class="materials-grand-totals">
+      <div class="materials-gt-item">
+        <div class="materials-gt-label">Furnace Mat.</div>
+        <div class="materials-gt-value">$${fmt(totals.furnaceMaterialsTotal)}</div>
+      </div>
+      <div class="materials-gt-item">
+        <div class="materials-gt-label">A/C Mat.</div>
+        <div class="materials-gt-value">$${fmt(totals.acMaterialsTotal)}</div>
+      </div>
+      <div class="materials-gt-item">
+        <div class="materials-gt-label">General Mat.</div>
+        <div class="materials-gt-value">$${fmt(totals.generalMaterialsTotal)}</div>
+      </div>
+      <div class="materials-gt-item">
+        <div class="materials-gt-label">Total Labor</div>
+        <div class="materials-gt-value">$${fmt(totals.totalLabor)}</div>
+      </div>
+      <div class="materials-gt-item">
+        <div class="materials-gt-label">Grand Total</div>
+        <div class="materials-gt-value">$${fmt(grandTotal)}</div>
+      </div>
+    </div>`;
+}
+
+export function toggleMaterialsCard() {
+  proposalState._materialsExpanded = !proposalState._materialsExpanded;
+  const card = document.getElementById('materialsCard');
+  if (!card) return;
+  card.classList.toggle('expanded', proposalState._materialsExpanded);
+  // One-shot animation only on expand toggle
+  if (proposalState._materialsExpanded) {
+    const body = card.querySelector('.materials-body');
+    if (body) {
+      body.classList.add('animating');
+      body.addEventListener('animationend', () => body.classList.remove('animating'), { once: true });
+    }
+  }
+}
+
+export function toggleDuctCalc() {
+  proposalState._ductCalcExpanded = !proposalState._ductCalcExpanded;
+  const el = document.querySelector('.duct-collapsible');
+  if (!el) return;
+  el.classList.toggle('expanded', proposalState._ductCalcExpanded);
+  if (proposalState._ductCalcExpanded) {
+    const body = el.querySelector('.duct-collapsible-body');
+    if (body) {
+      body.classList.add('animating');
+      body.addEventListener('animationend', () => body.classList.remove('animating'), { once: true });
+    }
+  }
+}
+
+export function updateMaterialQty(stateKey, itemIdx, value) {
+  proposalState.materials[stateKey][itemIdx].qty = parseFloat(value) || 0;
+  scheduleMaterialsCardRerender();
+}
+
+export function updateLaborHours(catIdx, type, value) {
+  const key = type === '90' ? 'hours90' : 'hours80';
+  proposalState.materials.labor[catIdx][key] = parseFloat(value) || 0;
+  scheduleMaterialsCardRerender();
+}
+
+export function updateLaborRate(value) {
+  proposalState.materials.laborRate = parseFloat(value) || 50;
+  scheduleMaterialsCardRerender();
+}
+
+export function updateACLaborHours(value) {
+  proposalState.materials.acLaborHours = parseFloat(value) || 0;
+  scheduleMaterialsCardRerender();
+}
+
+export function updateGeneralLaborHours(value) {
+  proposalState.materials.generalLaborHours = parseFloat(value) || 0;
+  scheduleMaterialsCardRerender();
+}
+
+export function updateDuctRun(typeKey, runIdx, field, value) {
+  const runs = proposalState.materials.ductRuns[typeKey];
+  if (runs && runs[runIdx]) {
+    runs[runIdx][field] = parseFloat(value) || 0;
+  }
+  scheduleMaterialsCardRerender();
+}
+
+export function addDuctRow(typeKey) {
+  const runs = proposalState.materials.ductRuns[typeKey];
+  if (runs && runs.length < MAX_DUCT_ROWS) {
+    runs.push(createDuctRun());
+    scheduleMaterialsCardRerender();
+  }
+}
+
+export function updateDuctWaste(value) {
+  proposalState.materials.ductWasteFactor = (parseFloat(value) || 0) / 100;
+  scheduleMaterialsCardRerender();
+}
+
+function scheduleMaterialsCardRerender() {
+  if (materialsRenderTimer !== null) clearTimeout(materialsRenderTimer);
+  materialsRenderTimer = setTimeout(() => {
+    materialsRenderTimer = null;
+    rerenderMaterialsCard();
+  }, 0);
+}
+
+function rerenderMaterialsCard() {
+  const matWrap = document.getElementById('eqMaterials');
+  if (!matWrap) return;
+
+  // Preserve focused input position and scroll state
+  const allInputs = Array.from(matWrap.querySelectorAll('input'));
+  const focusedEl = matWrap.contains(document.activeElement) ? document.activeElement : null;
+  const focusedIdx = allInputs.indexOf(focusedEl);
+  const focusedKey = focusedEl?.dataset?.materialsFocusKey || '';
+  const scrollPositions = [];
+  matWrap.querySelectorAll('.mat-scroll').forEach((el, i) => {
+    scrollPositions[i] = el.scrollTop;
+  });
+
+  // Re-render (no animation class — just a stable content swap)
+  matWrap.innerHTML = renderMaterialsCard();
+
+  // Restore scroll positions
+  matWrap.querySelectorAll('.mat-scroll').forEach((el, i) => {
+    if (scrollPositions[i] !== undefined) el.scrollTop = scrollPositions[i];
+  });
+
+  // Restore focus to the same input position
+  if (focusedIdx >= 0) {
+    const newInputs = Array.from(matWrap.querySelectorAll('input'));
+    const focusTarget = newInputs.find(input => input.dataset.materialsFocusKey === focusedKey)
+      || newInputs[focusedIdx];
+    if (focusTarget) focusTarget.focus();
+  }
+}
+
 function normalizeOption(option, idx) {
   if (!option.label) option.label = `Option ${idx + 1}`;
   if (!Array.isArray(option.iaqSelections) || option.iaqSelections.length === 0) {
@@ -716,7 +1149,7 @@ function calculateOptionFinancials(option) {
     const acWithCoil = { ...normalized.ac, coilCost: normalized.coil?.cost || 0 };
     const acPrice = PE.calculateACPrice(
       acWithCoil,
-      materials.acGeneralMaterialsTotal,
+      materials.acMaterialsTotal + materials.generalMaterialsTotal,
       materials.acLaborTotal + materials.generalLaborTotal,
       Boolean(showFurnace && normalized.furnace)
     );
