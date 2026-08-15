@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Carina's Chompy Game</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23e0264f'/></svg>" />
+</head>
+<body>
+  <div id="app">
+    <!-- HUD -->
+    <header id="hud">
+      <div class="card">
+        <div class="pill purple">GOAL</div>
+        <div class="goal-body">
+          <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="#3fb0f0" stroke="#1d7fc0" stroke-width="2.5"/><circle cx="14" cy="17" r="2.6" fill="#123"/><circle cx="26" cy="17" r="2.6" fill="#123"/><path d="M13 25 Q20 31 27 25" stroke="#123" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="10.5" cy="23" r="2.6" fill="#ff9db4" opacity="0.85"/><circle cx="29.5" cy="23" r="2.6" fill="#ff9db4" opacity="0.85"/></svg>
+          <span>× 3</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="pill blue">TIME</div>
+        <div class="timer-body">
+          <span id="timerDigits">2:00</span>
+          <div id="timerBar"><div id="timerFill" class="green"></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="pill pink">SCORE</div>
+        <div class="score-body"><span class="score-star">⭐</span><span id="scoreNum">0</span></div>
+      </div>
+    </header>
+
+    <!-- 3-chomp progress -->
+    <div id="progressRow">
+      <div class="slot">1</div>
+      <div class="slot">2</div>
+      <div class="slot">3</div>
+    </div>
+
+    <!-- game stage -->
+    <div id="stage">
+      <canvas id="game"></canvas>
+
+      <div id="tapBubble" class="hidden">👆 TAP!</div>
+      <div id="winBanner" class="hidden">🎉 Hooray! ⭐ +10 🎉</div>
+
+      <!-- title -->
+      <div id="titleOverlay" class="overlay">
+        <div class="overlay-panel">
+          <h1 class="game-title">Carina's<br />Chompy Game</h1>
+          <p class="game-subtitle">Tap to chomp the runner — 3 times before time runs out!</p>
+          <button id="playBtn" class="big-button">▶ Play</button>
+        </div>
+      </div>
+
+      <!-- pause (Carina's request) -->
+      <div id="pauseOverlay" class="overlay hidden">
+        <div class="overlay-panel">
+          <span class="reset-heart">⏸️</span>
+          <h1 class="game-title">Paused</h1>
+          <button id="resumeBtn" class="big-button">▶ Keep playing</button>
+        </div>
+      </div>
+
+      <!-- friendly reset -->
+      <div id="resetOverlay" class="overlay hidden">
+        <div class="overlay-panel">
+          <span class="reset-heart">❤️</span>
+          <h1 class="game-title">Good try!</h1>
+          <p class="game-subtitle">Tap anywhere to play again</p>
+        </div>
+      </div>
+
+      <!-- idea box -->
+      <div id="ideaOverlay" class="overlay hidden">
+        <div class="overlay-panel">
+          <div id="ideaForm">
+            <h2>💡 Tell us your idea!</h2>
+            <p>Say it out loud or type it — the game is paused. Your ideas go to the game makers (Dad &amp; Claude)!</p>
+            <textarea id="ideaText" rows="3" placeholder="I wish the game had…"></textarea>
+            <div class="idea-actions">
+              <button id="ideaMic" type="button">🎙️ Talk</button>
+              <button id="ideaSend" type="button">Send 💌</button>
+              <button id="ideaCancel" type="button">Never mind</button>
+            </div>
+            <button id="ideaExport" type="button">💾 Save ideas file (for Dad)</button>
+          </div>
+          <div id="ideaThanks" class="hidden">
+            <span class="thanks-mail">💌</span>
+            Thank you!
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer id="hintBar">
+      <button id="ideaBtn" class="ui-button" title="Tell us your idea!">💡</button>
+      <button id="pauseBtn" class="ui-button" title="Pause">⏸️</button>
+      <span>⭐ Tap when a runner gets close to Chompy! ⭐</span>
+      <button id="soundBtn" class="ui-button" title="Sound on/off">🔊</button>
+    </footer>
+  </div>
+
+  <script src="js/path.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/feedback.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

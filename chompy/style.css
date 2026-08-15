@@ -1,0 +1,445 @@
+/* Carina's Chompy Game — friendly, chunky, kindergarten-proof UI. */
+
+* {
+  box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: 'Comic Sans MS', 'Segoe Print', 'Comic Neue', cursive, sans-serif;
+  background: linear-gradient(180deg, #6fc3f2 0%, #a8ddfa 55%, #c8ecff 100%);
+  display: flex;
+  justify-content: center;
+  touch-action: manipulation;
+  overflow-x: hidden;
+}
+
+#app {
+  width: min(1020px, 100vw);
+  padding: 10px 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* --- HUD cards ----------------------------------------------------------- */
+#hud {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  gap: 12px;
+}
+
+.card {
+  background: #fff8ea;
+  border-radius: 20px;
+  border: 3px solid #ffffff;
+  box-shadow: 0 5px 0 rgba(35, 90, 140, 0.25);
+  padding: 26px 10px 10px;
+  position: relative;
+  text-align: center;
+  min-height: 88px;
+}
+
+.pill {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 1px;
+  padding: 4px 22px;
+  border-radius: 999px;
+  border: 3px solid #ffffff;
+  white-space: nowrap;
+}
+
+.pill.purple { background: #8a5cf5; }
+.pill.blue { background: #38a6ea; }
+.pill.pink { background: #f2569b; }
+
+.goal-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 30px;
+  font-weight: 700;
+  color: #5a3fa8;
+}
+
+.goal-body svg { width: 40px; height: 40px; }
+
+.timer-body { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+#timerDigits {
+  font-size: 40px;
+  font-weight: 700;
+  color: #1d5fa8;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+#timerBar {
+  width: 88%;
+  height: 16px;
+  background: #e3d9c2;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 2px solid #fff;
+}
+
+#timerFill {
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  transition: width 0.45s linear, background-color 0.6s;
+}
+
+#timerFill.green { background: #59c94f; }
+#timerFill.gold { background: #ffc93e; }
+#timerFill.low {
+  background: #ff9d5c;
+  animation: bar-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes bar-pulse {
+  50% { filter: brightness(1.25); }
+}
+
+.score-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 40px;
+  font-weight: 700;
+  color: #d63384;
+}
+
+.score-star { font-size: 34px; }
+
+#scoreNum.pop { animation: score-pop 0.6s ease; }
+
+@keyframes score-pop {
+  30% { transform: scale(1.6); color: #ff9d1f; }
+}
+
+#scoreNum { display: inline-block; }
+
+/* --- progress slots ------------------------------------------------------ */
+#progressRow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  padding: 8px;
+}
+
+.slot {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #e8e2d2;
+  border: 4px dashed #b8b0a0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 700;
+  color: #a89f8c;
+}
+
+.slot.filled {
+  border: 4px solid #fff;
+  background: #d8f2ff;
+  animation: slot-pop 0.5s cubic-bezier(0.2, 2.2, 0.4, 1);
+}
+
+.slot svg { width: 44px; height: 44px; }
+
+@keyframes slot-pop {
+  0% { transform: scale(0.2); }
+}
+
+/* --- stage --------------------------------------------------------------- */
+/* The stage scales down on short windows so the HUD, progress row, and the
+   button bar always fit on screen together — no scrolling to find buttons.
+   The subtracted constant approximates the height of everything else. */
+#stage {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  width: min(100%, calc((100vh - 310px) * 1.3333));
+  width: min(100%, calc((100dvh - 310px) * 1.3333));
+  min-width: 260px;
+  margin: 0 auto;
+  cursor: pointer;
+}
+
+#game {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 18px;
+}
+
+.ui-button {
+  flex: 0 0 auto;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: rgba(255, 248, 234, 0.92);
+  box-shadow: 0 4px 0 rgba(35, 90, 140, 0.25);
+  font-size: 27px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ui-button:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(35, 90, 140, 0.25); }
+
+
+/* TAP! coaching bubble */
+#tapBubble {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background: #fff;
+  border: 4px solid #ff9d1f;
+  color: #e0264f;
+  border-radius: 18px;
+  padding: 6px 18px;
+  font-size: 30px;
+  font-weight: 700;
+  pointer-events: none;
+  animation: tap-bounce 0.5s ease-in-out infinite alternate;
+  z-index: 4;
+  white-space: nowrap;
+}
+
+#tapBubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  transform: translateX(-50%);
+  border: 10px solid transparent;
+  border-top-color: #ff9d1f;
+}
+
+@keyframes tap-bounce {
+  to { transform: translate(-50%, -115%); }
+}
+
+/* --- overlays ------------------------------------------------------------ */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(40, 90, 140, 0.35);
+  border-radius: 18px;
+  z-index: 10;
+}
+
+.hidden { display: none !important; }
+
+.overlay-panel {
+  background: #fff8ea;
+  border: 4px solid #fff;
+  border-radius: 28px;
+  box-shadow: 0 10px 0 rgba(35, 90, 140, 0.3);
+  padding: 28px 36px;
+  text-align: center;
+  max-width: 86%;
+}
+
+.game-title {
+  font-size: clamp(34px, 6vw, 56px);
+  margin: 0 0 4px;
+  color: #e0264f;
+  text-shadow: 3px 3px 0 #ffd9e2;
+  line-height: 1.1;
+}
+
+.game-subtitle {
+  font-size: 20px;
+  color: #5a3fa8;
+  margin: 0 0 18px;
+}
+
+.big-button {
+  font-family: inherit;
+  font-size: 34px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(180deg, #6fdb5a, #3cb52e);
+  border: 4px solid #fff;
+  border-radius: 999px;
+  padding: 14px 54px;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #2c8a20;
+}
+
+.big-button:active { transform: translateY(4px); box-shadow: 0 2px 0 #2c8a20; }
+
+.reset-heart { font-size: 74px; animation: heart-beat 1s ease-in-out infinite; display: block; }
+
+@keyframes heart-beat {
+  30% { transform: scale(1.15); }
+}
+
+#winBanner {
+  position: absolute;
+  top: 14%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff8ea;
+  border: 4px solid #ffd23e;
+  border-radius: 999px;
+  padding: 10px 38px;
+  font-size: 34px;
+  font-weight: 700;
+  color: #ff9d1f;
+  z-index: 9;
+  animation: banner-drop 0.5s cubic-bezier(0.2, 2, 0.4, 1);
+  white-space: nowrap;
+}
+
+@keyframes banner-drop {
+  0% { transform: translate(-50%, -180%); }
+}
+
+/* --- idea box ------------------------------------------------------------ */
+#ideaOverlay .overlay-panel { width: min(560px, 92%); }
+
+#ideaOverlay h2 {
+  margin: 0 0 6px;
+  color: #5a3fa8;
+  font-size: 30px;
+}
+
+#ideaOverlay p {
+  margin: 0 0 14px;
+  color: #8a7f68;
+  font-size: 17px;
+}
+
+#ideaText {
+  width: 100%;
+  font-family: inherit;
+  font-size: 22px;
+  border: 3px solid #d9cfb8;
+  border-radius: 16px;
+  padding: 12px;
+  resize: none;
+  background: #fff;
+  color: #444;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+#ideaText:focus { outline: 3px solid #8a5cf5; }
+
+.idea-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.idea-actions button {
+  font-family: inherit;
+  font-size: 21px;
+  font-weight: 700;
+  border-radius: 999px;
+  border: 3px solid #fff;
+  padding: 10px 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(35, 90, 140, 0.2);
+}
+
+#ideaMic { background: #ffe9f1; color: #d63384; }
+#ideaMic.listening {
+  background: #ff5c8a;
+  color: #fff;
+  animation: mic-pulse 1s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  50% { transform: scale(1.06); box-shadow: 0 4px 18px rgba(255, 92, 138, 0.8); }
+}
+
+#ideaSend { background: #59c94f; color: #fff; }
+#ideaSend:disabled { opacity: 0.45; cursor: default; }
+#ideaCancel { background: #e8e2d2; color: #6a6152; }
+
+#ideaExport {
+  margin-top: 12px;
+  background: none;
+  border: none;
+  color: #9a8f78;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+#ideaThanks { font-size: 30px; color: #d63384; padding: 20px 0; }
+
+.thanks-mail { font-size: 60px; display: block; animation: mail-fly 1.4s ease forwards; }
+
+@keyframes mail-fly {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  70% { transform: translateY(-60px) scale(1.15); opacity: 1; }
+  100% { transform: translateY(-120px) scale(0.6); opacity: 0; }
+}
+
+/* --- hint bar ------------------------------------------------------------ */
+#hintBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #5a3fa8;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  padding: 6px 8px;
+}
+
+#hintBar span { flex: 1; }
+
+/* --- small screens -------------------------------------------------------- */
+@media (max-width: 640px) {
+  #stage {
+    width: min(100%, calc((100vh - 270px) * 1.3333));
+    width: min(100%, calc((100dvh - 270px) * 1.3333));
+  }
+  #hud { gap: 8px; }
+  .card { min-height: 72px; padding-top: 20px; }
+  #timerDigits { font-size: 30px; }
+  .goal-body { font-size: 22px; }
+  .goal-body svg { width: 30px; height: 30px; }
+  .score-body { font-size: 30px; }
+  .slot { width: 44px; height: 44px; }
+  .slot svg { width: 34px; height: 34px; }
+  #hintBar { font-size: 16px; }
+}
