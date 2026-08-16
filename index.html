@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>yenoh2 · Projects</title>
+  <meta name="description" content="Landing page for the games and tools hosted on yenoh2.github.io.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>">
+  <style>
+    :root {
+      --bg: #f6f5f1;
+      --card: #ffffff;
+      --ink: #1f2430;
+      --muted: #6b7280;
+      --line: rgba(31, 36, 48, 0.08);
+      --shadow: 0 1px 2px rgba(31, 36, 48, 0.05), 0 8px 24px rgba(31, 36, 48, 0.06);
+      --shadow-hover: 0 2px 4px rgba(31, 36, 48, 0.06), 0 14px 36px rgba(31, 36, 48, 0.12);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #14161c;
+        --card: #1d2029;
+        --ink: #e8eaf0;
+        --muted: #9aa1b0;
+        --line: rgba(232, 234, 240, 0.08);
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+        --shadow-hover: 0 2px 4px rgba(0, 0, 0, 0.35), 0 14px 36px rgba(0, 0, 0, 0.5);
+      }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 48px 20px 64px;
+    }
+    header { margin-bottom: 40px; }
+    h1 {
+      font-size: clamp(1.8rem, 4vw, 2.4rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .tagline {
+      color: var(--muted);
+      margin-top: 6px;
+      font-size: 1.05rem;
+    }
+    h2 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin: 36px 0 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px;
+      text-decoration: none;
+      color: inherit;
+      box-shadow: var(--shadow);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .card:hover, .card:focus-visible {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-hover);
+    }
+    .card:active { transform: translateY(0); }
+    .icon {
+      flex: none;
+      width: 52px;
+      height: 52px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      font-size: 1.7rem;
+      background: var(--tint, #eee);
+    }
+    .card h3 {
+      font-size: 1.02rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .card p {
+      font-size: 0.86rem;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+    footer {
+      margin-top: 56px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    footer a { color: inherit; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>✨ Projects</h1>
+      <p class="tagline">Games and tools that live on this site. Tap one to open it.</p>
+    </header>
+
+    <h2>Games</h2>
+    <div class="grid">
+      <a class="card" href="./chompy/">
+        <div class="icon" style="--tint: rgba(250, 204, 21, 0.25);">🐊</div>
+        <div>
+          <h3>Carina's Chompy Game</h3>
+          <p>Tap to chomp the runner as it passes — designed by Carina, age&nbsp;6.</p>
+        </div>
+      </a>
+      <a class="card" href="./highway-city-builder/">
+        <div class="icon" style="--tint: rgba(96, 165, 250, 0.25);">🏙️</div>
+        <div>
+          <h3>Highway City Builder</h3>
+          <p>Lay down highways and watch a city grow around them.</p>
+        </div>
+      </a>
+      <a class="card" href="./easter/">
+        <div class="icon" style="--tint: rgba(244, 114, 182, 0.25);">🥚</div>
+        <div>
+          <h3>Easter Egg Breaker</h3>
+          <p>Crack open eggs to see what's hiding inside.</p>
+        </div>
+      </a>
+    </div>
+
+    <h2>Tools</h2>
+    <div class="grid">
+      <a class="card" href="./load-calc/">
+        <div class="icon" style="--tint: rgba(251, 146, 60, 0.25);">🌡️</div>
+        <div>
+          <h3>HVAC Load Calculator</h3>
+          <p>Manual&nbsp;J-style heating and cooling loads, plus an equipment bid builder.</p>
+        </div>
+      </a>
+      <a class="card" href="./metronome/">
+        <div class="icon" style="--tint: rgba(52, 211, 153, 0.25);">🎵</div>
+        <div>
+          <h3>Metronome</h3>
+          <p>High-precision, touch-first metronome for iPad and desktop.</p>
+        </div>
+      </a>
+      <a class="card" href="./sprinkler/">
+        <div class="icon" style="--tint: rgba(56, 189, 248, 0.25);">💦</div>
+        <div>
+          <h3>Sprinkler Layout Tool</h3>
+          <p>Plan irrigation over a yard map — zones, piping, coverage, and a parts list.</p>
+        </div>
+      </a>
+    </div>
+
+    <footer>
+      Hosted on GitHub Pages · <a href="https://github.com/yenoh2">github.com/yenoh2</a>
+    </footer>
+  </div>
+</body>
+</html>
