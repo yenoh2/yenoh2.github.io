@@ -340,6 +340,18 @@ body {
 }
 
 /* Play Button — no circle, just the icon */
+.playback-status {
+    position: absolute;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: 16px;
+    right: 16px;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-color);
+    opacity: 0.85;
+    pointer-events: none;
+}
+
 .play-btn {
     background: transparent;
     border: none;

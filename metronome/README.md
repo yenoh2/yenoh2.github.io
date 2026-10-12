@@ -91,6 +91,24 @@ Notes:
 2. Tap Share → **Add to Home Screen**
 3. Launches fullscreen like a native app
 
+### Audio Recovery and Device Checks
+
+- Tap the play area again to cancel while sound is starting.
+- Playback starts only after the audio context is running and the click buffers are ready. A failed start shows a short retry message in the existing play area.
+- Stop clears queued sounds and beat flashes. Returning from another app or an audio interruption uses a fresh timing cycle, without replaying missed beats.
+- Voice loading has a deadline; if samples are unavailable, clicks remain usable. Voice counting retains its 150 BPM limit.
+- Supporting browsers are asked to use `navigator.audioSession.type = 'playback'`. This optional browser API is not a guarantee of iPhone Ring/Silent behavior, and it does not detect muted output.
+
+Before publication, test in Safari and from the home-screen shortcut on the actual iPad and an affected iPhone: first play after a reload, quick Start/Stop taps, switching apps, an alarm/interruption, and speaker/headphone changes. On the iPhone, test both Ring/Silent positions at an audible media volume. If there is no sound, check volume, Silent Mode, and the selected output; do not assume a playing indicator proves audible speaker output.
+
+Run the dependency-free audio regression checks with:
+
+```bash
+node --test scripts/audio-lifecycle.test.cjs
+```
+
+These checks use controlled audio/context timing. They do not replace physical iOS audio tests.
+
 ---
 
 ## Tech Stack

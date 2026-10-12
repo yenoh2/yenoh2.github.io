@@ -46,6 +46,17 @@ let spokenCountManifestPromises = {};
 let spokenCountPackCache = {};
 let spokenCountPackPromises = {};
 let isPreparingPlayback = false;
+let playbackRequested = false;
+let preparationController = null;
+let woodblockPreparationPromise = null;
+let transportEpoch = 0;
+let schedulerTimerId = null;
+let scheduledSubdivision = null;
+const visualTimers = new Set();
+const scheduledSounds = new Set();
+const AUDIO_START_TIMEOUT_MS = 2000;
+const VOICE_START_TIMEOUT_MS = 1500;
+const SCHEDULER_INTERVAL_MS = 25;
 
 // DOM Elements
 const bpmValueEl = document.getElementById('bpmValue');
@@ -66,6 +77,7 @@ const editRow2Btn = document.getElementById('editRow2');
 const numberPadOverlay = document.getElementById('numberPadOverlay');
 const numpadDisplay = document.getElementById('numpadDisplay');
 const spokenCountToggleBtn = document.getElementById('spokenCountBtn');
+const playbackStatusEl = document.getElementById('playbackStatus');
 
 // Number Pad State
 let numpadValue = '';
@@ -89,30 +101,172 @@ function init() {
 let woodblockHighBuffer = null;
 let woodblockLowBuffer = null;
 
-function unlockAudioContext() {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function configureAudioSession(type) {
+    // Ask supporting browsers for music-style routing, including on iOS.
+    // This API is optional; the actual Ring/Silent behavior needs device testing.
+    try {
+        if (navigator.audioSession) navigator.audioSession.type = type;
+    } catch (error) {
+        console.warn('Unable to configure the audio session', error);
+    }
+}
 
-        // Start rendering buffers immediately
-        renderOfflineWoodblock(1200).then(buffer => {
-            woodblockHighBuffer = buffer;
-        });
-        renderOfflineWoodblock(800).then(buffer => {
-            woodblockLowBuffer = buffer;
-        });
+function unlockAudioContext() {
+    configureAudioSession('playback');
+
+    if (!audioCtx || audioCtx.state === 'closed') {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const context = audioCtx;
+        context.addEventListener('statechange', () => handleAudioContextStateChange(context));
+        woodblockHighBuffer = null;
+        woodblockLowBuffer = null;
+        woodblockPreparationPromise = null;
     }
-    // Fire-and-forget: do NOT await — awaiting resume() inside an async
-    // handler causes re-entrancy on iOS where the promise resolves late.
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
+
+    if ((!woodblockHighBuffer || !woodblockLowBuffer) && !woodblockPreparationPromise) {
+        const context = audioCtx;
+        woodblockPreparationPromise = Promise.all([
+            renderOfflineWoodblock(1200), renderOfflineWoodblock(800)
+        ]).then(([high, low]) => {
+            if (audioCtx === context) {
+                woodblockHighBuffer = high;
+                woodblockLowBuffer = low;
+            }
+        }).catch(error => {
+            if (audioCtx === context) woodblockPreparationPromise = null;
+            throw error;
+        });
+        // Keep a failed render handled even if resume/unlock throws first.
+        woodblockPreparationPromise.catch(() => {});
     }
+
+    // Call resume and play the unlock buffer synchronously in the tap handler.
+    // The preparation guard is already set before we later await readiness.
+    const context = audioCtx;
+    const resumePromise = context.state === 'running'
+        ? Promise.resolve()
+        : context.resume();
+    Promise.resolve(resumePromise).catch(() => {});
     // iOS Safari requires playing a silent buffer within the user gesture
     // to fully transition the AudioContext to the 'running' state.
     const silentBuf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
     const src = audioCtx.createBufferSource();
     src.buffer = silentBuf;
     src.connect(audioCtx.destination);
+    src.onended = () => src.disconnect();
     src.start(0);
+    return { context, resumePromise };
+}
+
+function waitForPreparation(promise, signal, timeoutMs, timeoutMessage) {
+    return new Promise((resolve, reject) => {
+        let timer;
+        let settled = false;
+        const finish = (error, value) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            signal.removeEventListener('abort', onAbort);
+            if (error) reject(error);
+            else resolve(value);
+        };
+        const onAbort = () => finish(new DOMException('Playback cancelled', 'AbortError'));
+        if (signal.aborted) return onAbort();
+        signal.addEventListener('abort', onAbort, { once: true });
+        timer = setTimeout(() => finish(new Error(timeoutMessage)), timeoutMs);
+        Promise.resolve(promise).then(value => finish(null, value), error => finish(error));
+    });
+}
+
+function waitForRunningContext(context, resumePromise, signal) {
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = error => {
+            if (settled) return;
+            settled = true;
+            context.removeEventListener('statechange', onStateChange);
+            signal.removeEventListener('abort', onAbort);
+            if (error) reject(error);
+            else resolve();
+        };
+        const onStateChange = () => {
+            if (context.state === 'running') finish();
+            else if (context.state === 'closed') finish(new Error('Audio context closed'));
+        };
+        const onAbort = () => finish(new DOMException('Playback cancelled', 'AbortError'));
+        context.addEventListener('statechange', onStateChange);
+        signal.addEventListener('abort', onAbort, { once: true });
+        Promise.resolve(resumePromise).then(onStateChange, finish);
+        if (signal.aborted) onAbort();
+        else onStateChange();
+    });
+}
+
+function setPlaybackStatus(message = '') {
+    playbackStatusEl.textContent = message;
+    playbackStatusEl.hidden = !message;
+}
+
+function updatePlayButton() {
+    playButton.innerHTML = isPlaying
+        ? '<svg viewBox="0 0 24 24" fill="currentColor" width="80" height="80"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="currentColor" width="80" height="80"><path d="M8 5v14l11-7z"/></svg>';
+    playButton.classList.toggle('playing', isPlaying);
+    playButton.setAttribute('aria-label', isPreparingPlayback ? 'Cancel Starting Metronome'
+        : isPlaying ? 'Stop Metronome' : 'Start Metronome');
+    playButton.setAttribute('aria-pressed', String(isPlaying));
+}
+
+function clearScheduledPlayback() {
+    clearTimeout(schedulerTimerId);
+    schedulerTimerId = null;
+    visualTimers.forEach(clearTimeout);
+    visualTimers.clear();
+    for (const sound of scheduledSounds) {
+        sound.source.onended = null;
+        try { sound.source.stop(); } catch (_) { /* Already ended. */ }
+        sound.source.disconnect();
+        sound.gainNode.disconnect();
+    }
+    scheduledSounds.clear();
+}
+
+function stopTransport({ preserveRequest = false, message = '' } = {}) {
+    if (!preserveRequest) playbackRequested = false;
+    const controller = preparationController;
+    preparationController = null;
+    isPreparingPlayback = false;
+    controller?.abort();
+    isPlaying = false;
+    transportEpoch++;
+    clearScheduledPlayback();
+    resetVisuals();
+    updatePlayButton();
+    setPlaybackStatus(message);
+    configureAudioSession('auto');
+    releaseWakeLock();
+}
+
+function retireAudioContext(context) {
+    if (!context || context !== audioCtx) return;
+    audioCtx = null;
+    woodblockHighBuffer = null;
+    woodblockLowBuffer = null;
+    woodblockPreparationPromise = null;
+    if (context.state !== 'closed') {
+        try { Promise.resolve(context.close()).catch(error => console.warn('Unable to close audio context', error)); }
+        catch (error) { console.warn('Unable to close audio context', error); }
+    }
+}
+
+function handleAudioContextStateChange(context) {
+    if (context !== audioCtx) return;
+    if (isPlaying && context.state !== 'running') {
+        stopTransport({ preserveRequest: true, message: 'Sound paused. Tap to resume.' });
+    } else if (context.state === 'running' && playbackRequested && !isPlaying
+        && !isPreparingPlayback && document.visibilityState === 'visible') {
+        startPlayback();
+    }
 }
 
 // Render sound using OfflineAudioContext (The "Baking" process)
@@ -186,13 +340,17 @@ function getSchedulerSubdivision() {
 }
 
 function restartTransportCycle() {
+    transportEpoch++;
+    clearScheduledPlayback();
     currentBeat = 0;
+    scheduledSubdivision = getSchedulerSubdivision();
 
     if (audioCtx) {
         nextNoteTime = audioCtx.currentTime + 0.05;
     }
 
     resetVisuals();
+    if (isPlaying) scheduler(transportEpoch);
 }
 
 function resolveSpokenCountPackIdForBpm(targetBpm = Math.round(bpm)) {
@@ -348,6 +506,10 @@ async function ensureSpokenCountPackLoaded(packId) {
                 words: Object.fromEntries(entries)
             };
             spokenCountPackCache[cacheKey] = pack;
+            if (isPlaying && isSpokenCountActiveForTempo()
+                && playbackStatusEl.textContent === 'Voice unavailable. Clicks still work.') {
+                setPlaybackStatus('');
+            }
             return pack;
         }).catch(error => {
             console.error(`Failed to load spoken count pack '${resolvedPackId}'`, error);
@@ -402,6 +564,13 @@ function playBufferedSound(time, buffer, gainValue, playbackRate = 1, startOffse
 
     source.connect(gainNode);
     gainNode.connect(audioCtx.destination);
+    const sound = { source, gainNode };
+    scheduledSounds.add(sound);
+    source.onended = () => {
+        scheduledSounds.delete(sound);
+        source.disconnect();
+        gainNode.disconnect();
+    };
     source.start(time, safeStartOffset);
 }
 
@@ -481,10 +650,13 @@ function scheduleStep(time, stepIndex, schedulerSubdivision) {
         playBufferedSound(time, bufferToPlay, 0.5);
 
         if (stepInBeat === 0) {
+            const epoch = transportEpoch;
             const drawTime = (time - audioCtx.currentTime) * 1000;
-            setTimeout(() => {
-                updateBeatVisuals(majorBeat);
+            const timer = setTimeout(() => {
+                visualTimers.delete(timer);
+                if (isPlaying && epoch === transportEpoch) updateBeatVisuals(majorBeat);
             }, Math.max(0, drawTime));
+            visualTimers.add(timer);
         }
     }
 
@@ -501,28 +673,46 @@ function nextNote(schedulerSubdivision) {
     }
 }
 
-function scheduler() {
+function scheduler(epoch = transportEpoch) {
+    if (!isPlaying || epoch !== transportEpoch) return;
+    schedulerTimerId = null;
+    if (audioCtx.state !== 'running') {
+        handleAudioContextStateChange(audioCtx);
+        return;
+    }
     const schedulerSubdivision = getSchedulerSubdivision();
+
+    // A suspended tab or busy main thread must not replay missed beats in a burst.
+    if (nextNoteTime < audioCtx.currentTime - 0.05
+        || scheduledSubdivision !== schedulerSubdivision) {
+        restartTransportCycle();
+        return;
+    }
 
     while (nextNoteTime < audioCtx.currentTime + scheduleAheadTime) {
         scheduleStep(nextNoteTime, currentBeat, schedulerSubdivision);
         nextNote(schedulerSubdivision);
     }
-    if (isPlaying) {
-        requestAnimationFrame(scheduler);
-    }
+    schedulerTimerId = setTimeout(() => scheduler(epoch), SCHEDULER_INTERVAL_MS);
 }
 // --- Wake Lock ---
 let wakeLock = null;
 
 async function requestWakeLock() {
+    const epoch = transportEpoch;
+    if (wakeLock && !wakeLock.released) return;
     try {
         if ('wakeLock' in navigator) {
-            wakeLock = await navigator.wakeLock.request('screen');
-            wakeLock.addEventListener('release', () => {
-                console.log('Wake Lock was released');
+            const lock = await navigator.wakeLock.request('screen');
+            if (!isPlaying || epoch !== transportEpoch || document.visibilityState !== 'visible'
+                || (wakeLock && !wakeLock.released)) {
+                await lock.release();
+                return;
+            }
+            wakeLock = lock;
+            lock.addEventListener('release', () => {
+                if (wakeLock === lock) wakeLock = null;
             });
-            console.log('Wake Lock is active');
         }
     } catch (err) {
         console.error(`${err.name}, ${err.message}`);
@@ -530,92 +720,92 @@ async function requestWakeLock() {
 }
 
 async function releaseWakeLock() {
-    if (wakeLock !== null) {
-        await wakeLock.release();
-        wakeLock = null;
+    const lock = wakeLock;
+    wakeLock = null;
+    if (lock && !lock.released) {
+        try { await lock.release(); } catch (error) { console.warn('Unable to release wake lock', error); }
     }
 }
 
 // Handle visibility change — re-unlock AudioContext on iOS when returning to foreground
-document.addEventListener('visibilitychange', async () => {
+document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
-        await releaseWakeLock();
-    } else if (document.visibilityState === 'visible' && isPlaying && audioCtx) {
-        // iOS suspends AudioContext when backgrounded; re-resume it
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
+        if (playbackRequested) {
+            stopTransport({ preserveRequest: true, message: 'Sound paused. Tap to resume.' });
         }
-        requestWakeLock();
+    } else if (document.visibilityState === 'visible' && playbackRequested && !isPreparingPlayback) {
+        startPlayback();
     }
 });
 
 async function togglePlay() {
-    // Synchronous unlock — must happen inside the user gesture, never awaited
-    unlockAudioContext();
-
-    // --- STOP path: always immediate, no async work ---
-    if (isPlaying) {
-        isPlaying = false;
-        playButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="80" height="80"><path d="M8 5v14l11-7z"/></svg>`;
-        playButton.classList.remove('playing');
-        releaseWakeLock();
-        resetVisuals();
+    if (isPlaying || isPreparingPlayback) {
+        stopTransport();
         return;
     }
+    playbackRequested = true;
+    return startPlayback();
+}
 
-    // --- START path: guard against re-entrancy BEFORE any await ---
-    if (isPreparingPlayback) {
-        return;
-    }
+async function startPlayback() {
+    if (isPlaying || isPreparingPlayback) return;
+    const controller = new AbortController();
+    preparationController = controller;
     isPreparingPlayback = true;
+    let playbackContext = null;
+    updatePlayButton();
+    setPlaybackStatus('Starting sound… Tap to cancel.');
 
     try {
-        // Wait for AudioContext to reach 'running' state (iOS may take a moment)
-        if (audioCtx.state !== 'running') {
-            await new Promise(resolve => {
-                const onRunning = () => {
-                    if (audioCtx.state === 'running') {
-                        audioCtx.removeEventListener('statechange', onRunning);
-                        resolve();
-                    }
-                };
-                audioCtx.addEventListener('statechange', onRunning);
-                // Safety timeout so we never hang indefinitely
-                setTimeout(() => {
-                    audioCtx.removeEventListener('statechange', onRunning);
-                    resolve();
-                }, 500);
-            });
-        }
+        const { context, resumePromise } = unlockAudioContext();
+        playbackContext = context;
+        await waitForPreparation(Promise.all([
+            waitForRunningContext(context, resumePromise, controller.signal),
+            woodblockPreparationPromise
+        ]), controller.signal, AUDIO_START_TIMEOUT_MS, 'Audio did not become ready');
 
-        // Wait for woodblock buffers to be ready (critical on first play)
-        if (!woodblockHighBuffer || !woodblockLowBuffer) {
-            const timeout = new Promise(resolve => setTimeout(resolve, 500));
-            await Promise.race([
-                Promise.all([
-                    woodblockHighBuffer || renderOfflineWoodblock(1200).then(b => { woodblockHighBuffer = b; }),
-                    woodblockLowBuffer  || renderOfflineWoodblock(800).then(b => { woodblockLowBuffer = b; })
-                ]),
-                timeout
-            ]);
-        }
-
-        if (spokenCountEnabled) {
+        let voiceUnavailable = false;
+        if (isSpokenCountActiveForTempo()) {
             try {
-                await warmSpokenCountPackForCurrentTempo();
+                await waitForPreparation(
+                    ensureSpokenCountPackLoaded(resolveSpokenCountPackIdForBpm()),
+                    controller.signal, VOICE_START_TIMEOUT_MS, 'Voice samples did not become ready'
+                );
             } catch (error) {
-                console.error('Failed to prepare spoken count before playback', error);
+                if (error.name === 'AbortError') throw error;
+                voiceUnavailable = true;
+                console.warn('Starting with clicks while voice is unavailable', error);
             }
         }
 
+        if (controller.signal.aborted || !playbackRequested) return;
+        if (context !== audioCtx || context.state !== 'running'
+            || !woodblockHighBuffer || !woodblockLowBuffer) {
+            throw new Error('Audio is not ready');
+        }
+
+        isPreparingPlayback = false;
         isPlaying = true;
         restartTransportCycle();
-        playButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="80" height="80"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
-        playButton.classList.add('playing');
+        updatePlayButton();
+        setPlaybackStatus(voiceUnavailable ? 'Voice unavailable. Clicks still work.'
+            : spokenCountEnabled && !isSpokenCountActiveForTempo() ? 'Voice works up to 150 BPM.' : '');
         requestWakeLock();
-        scheduler();
+    } catch (error) {
+        if (error.name !== 'AbortError' && preparationController === controller) {
+            console.warn('Unable to start metronome audio', error);
+            stopTransport({ message: 'Sound couldn’t start. Tap to try again.' });
+            // A stuck iOS context should not require closing the whole app.
+            // The next tap creates a new context inside a fresh user gesture.
+            retireAudioContext(playbackContext);
+        }
     } finally {
-        isPreparingPlayback = false;
+        controller.abort();
+        if (preparationController === controller) {
+            preparationController = null;
+            isPreparingPlayback = false;
+            updatePlayButton();
+        }
     }
 }
 
@@ -787,6 +977,20 @@ function setupEventListeners() {
         triggerPlayZoneTap(t.clientX, t.clientY);
     }, { passive: false });
 
+    // Some browsers grant audio activation on touchend, after our immediate
+    // touchstart action. Retry the unlock in that gesture without toggling twice.
+    mainControls.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (isPreparingPlayback && audioCtx && audioCtx.state !== 'running') {
+            try {
+                const { resumePromise } = unlockAudioContext();
+                Promise.resolve(resumePromise).catch(error => console.warn('Audio unlock retry failed', error));
+            } catch (error) {
+                console.warn('Audio unlock retry failed', error);
+            }
+        }
+    }, { passive: false });
+
     timeSigSelect.addEventListener('change', (e) => {
         timeSignature = parseInt(e.target.value);
         restartTransportCycle();
@@ -808,23 +1012,16 @@ function setupEventListeners() {
         saveSettings();
     });
 
-    spokenCountToggleBtn.addEventListener('click', async (e) => {
+    spokenCountToggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         spokenCountEnabled = !spokenCountEnabled;
         updateSpokenCountToggleUI();
         saveSettings();
 
-        if (spokenCountEnabled) {
-            try {
-                await warmSpokenCountPackForCurrentTempo();
-            } catch (error) {
-                console.error('Failed to enable spoken count', error);
-            }
-        }
-
         if (isPlaying) {
             restartTransportCycle();
         }
+        if (spokenCountEnabled) warmSpokenCountPackForCurrentTempo();
     });
 
     // Fine Tune
