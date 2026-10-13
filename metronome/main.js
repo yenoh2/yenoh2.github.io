@@ -730,6 +730,7 @@ async function releaseWakeLock() {
 // Handle visibility change — re-unlock AudioContext on iOS when returning to foreground
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
+        resetPlayZoneTouch();
         if (playbackRequested) {
             stopTransport({ preserveRequest: true, message: 'Sound paused. Tap to resume.' });
         }
@@ -786,6 +787,8 @@ async function startPlayback() {
 
         isPreparingPlayback = false;
         isPlaying = true;
+        // Protect the first audible beat too when preparation took a while.
+        playZoneLastStartAt = performance.now();
         restartTransportCycle();
         updatePlayButton();
         setPlaybackStatus(voiceUnavailable ? 'Voice unavailable. Clicks still work.'
@@ -943,6 +946,41 @@ function setupDial() {
 
 // --- Event Listeners ---
 const mainControls = document.querySelector('.main-controls');
+const PLAY_ZONE_RESTART_GUARD_MS = 600;
+const TOUCH_CLICK_GUARD_MS = 700;
+let playZoneLastStartAt = -Infinity;
+let playZoneLastTouchAt = -Infinity;
+let playZoneTouchActive = false;
+let playZoneTouchAccepted = false;
+
+function resetPlayZoneTouch() {
+    playZoneTouchActive = false;
+    playZoneTouchAccepted = false;
+}
+
+function finishPlayZoneTouch(e) {
+    if (!playZoneTouchActive) return;
+    playZoneLastTouchAt = performance.now();
+    if (e.touches.length) return;
+    // Retry in the release gesture on browsers that activate audio on touchend.
+    if (playZoneTouchAccepted && isPreparingPlayback && audioCtx && audioCtx.state !== 'running') {
+        try {
+            const { resumePromise } = unlockAudioContext();
+            Promise.resolve(resumePromise).catch(error => console.warn('Audio unlock retry failed', error));
+        } catch (error) {
+            console.warn('Audio unlock retry failed', error);
+        }
+    }
+    resetPlayZoneTouch();
+}
+
+function cancelPlayZoneTouch(e) {
+    if (!playZoneTouchActive) return;
+    playZoneLastTouchAt = performance.now();
+    if (playZoneTouchAccepted && isPreparingPlayback) stopTransport();
+    playZoneTouchAccepted = false;
+    if (!e.touches.length) resetPlayZoneTouch();
+}
 
 function spawnRipple(x, y) {
     const rect = mainControls.getBoundingClientRect();
@@ -957,6 +995,12 @@ function spawnRipple(x, y) {
 }
 
 function triggerPlayZoneTap(x, y) {
+    // Stop/cancel is always immediate. Only closely repeated Starts are ignored.
+    const now = performance.now();
+    if (!isPlaying && !isPreparingPlayback) {
+        if (now - playZoneLastStartAt < PLAY_ZONE_RESTART_GUARD_MS) return;
+        playZoneLastStartAt = now;
+    }
     spawnRipple(x, y);
     // Tactile press animation on the button
     playButton.classList.add('pressed');
@@ -967,12 +1011,22 @@ function triggerPlayZoneTap(x, y) {
 function setupEventListeners() {
     // Wire the whole play zone, not just the small button
     mainControls.addEventListener('click', (e) => {
+        // Keep keyboard/assistive clicks (detail 0), but ignore a touch's
+        // compatibility click even on browsers without sourceCapabilities.
+        const touchSource = e.sourceCapabilities?.firesTouchEvents;
+        if (e.detail !== 0 && (touchSource === true || (touchSource !== false
+            && (playZoneTouchActive || performance.now() - playZoneLastTouchAt < TOUCH_CLICK_GUARD_MS)))) return;
         triggerPlayZoneTap(e.clientX, e.clientY);
     });
 
     mainControls.addEventListener('touchstart', (e) => {
         // Prevent ghost click from also firing
         e.preventDefault();
+        playZoneLastTouchAt = performance.now();
+        if (playZoneTouchActive || !e.touches.length) return;
+        playZoneTouchActive = true;
+        playZoneTouchAccepted = e.touches.length === 1;
+        if (!playZoneTouchAccepted) return;
         const t = e.touches[0];
         triggerPlayZoneTap(t.clientX, t.clientY);
     }, { passive: false });
@@ -981,15 +1035,18 @@ function setupEventListeners() {
     // touchstart action. Retry the unlock in that gesture without toggling twice.
     mainControls.addEventListener('touchend', (e) => {
         e.preventDefault();
-        if (isPreparingPlayback && audioCtx && audioCtx.state !== 'running') {
-            try {
-                const { resumePromise } = unlockAudioContext();
-                Promise.resolve(resumePromise).catch(error => console.warn('Audio unlock retry failed', error));
-            } catch (error) {
-                console.warn('Audio unlock retry failed', error);
-            }
-        }
+        finishPlayZoneTouch(e);
     }, { passive: false });
+
+    mainControls.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        cancelPlayZoneTouch(e);
+    }, { passive: false });
+
+    // A remaining finger may belong to a different control. Its final release
+    // must rearm the play area too, without preventing that control's defaults.
+    document.addEventListener('touchend', finishPlayZoneTouch);
+    document.addEventListener('touchcancel', cancelPlayZoneTouch);
 
     timeSigSelect.addEventListener('change', (e) => {
         timeSignature = parseInt(e.target.value);

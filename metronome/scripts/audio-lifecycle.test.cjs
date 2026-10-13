@@ -99,6 +99,7 @@ function fixture(options = {}) {
     const context = vm.createContext({
         document, navigator, window: { AudioContext }, OfflineAudioContext,
         AbortController, DOMException,
+        performance: { now: () => now },
         localStorage: { getItem: () => null, setItem() {} },
         fetch: async url => {
             if (options.fetch) return options.fetch(url);
@@ -133,8 +134,231 @@ function fixture(options = {}) {
     const audibleSources = () => contexts.flatMap(audio => audio.sources)
         .filter(sound => sound.buffer?.kind !== 'silent' && sound.started);
     return { run, tick, timers, contexts, element, navigator, events, document, audibleSources,
+        documentTouch(type, event) { documentListeners.get(type)?.(event); },
         visibility(state) { document.visibilityState = state; documentListeners.get('visibilitychange')(); } };
 }
+
+function touchEvent(count) {
+    const touches = Array.from({ length: count }, (_, identifier) => ({ identifier,
+        clientX: 90 + identifier * 10, clientY: 105 }));
+    return { touches, changedTouches: touches, preventDefault() {} };
+}
+
+function clickEvent(detail = 1, firesTouchEvents = false) {
+    return { detail, clientX: 105, clientY: 105, sourceCapabilities: { firesTouchEvents } };
+}
+
+test('overlapping fingers produce one activation until every finger is lifted', async () => {
+    const f = fixture();
+    f.run('setupEventListeners()');
+    const zone = f.element('play-zone');
+    zone.listeners.touchstart(touchEvent(1));
+    await flush();
+    assert.equal(f.run('isPlaying'), true);
+    zone.listeners.touchstart(touchEvent(2));
+    await flush();
+    assert.equal(f.run('isPlaying'), true, 'the second finger must not toggle playback');
+    zone.listeners.touchstart(touchEvent(3));
+    await flush();
+    assert.equal(f.run('isPlaying'), true, 'extra fingers must not stop or restart the first activation');
+    zone.listeners.touchend(touchEvent(2));
+    zone.listeners.touchstart(touchEvent(3));
+    await flush();
+    assert.equal(f.run('isPlaying'), true, 'lifting one finger does not arm another activation');
+    zone.listeners.touchend(touchEvent(0));
+    zone.listeners.touchstart(touchEvent(1));
+    assert.equal(f.run('isPlaying'), false, 'a fresh one-finger Stop remains immediate');
+});
+
+test('a simultaneous multi-finger chord is ignored until all fingers are released', async () => {
+    const f = fixture();
+    f.run('setupEventListeners()');
+    const zone = f.element('play-zone');
+    zone.listeners.touchstart(touchEvent(5));
+    await flush();
+    assert.equal(f.run('isPlaying || isPreparingPlayback'), false, 'the initial chord is not a Start');
+    zone.listeners.touchend(touchEvent(1));
+    zone.listeners.touchstart(touchEvent(2));
+    await flush();
+    assert.equal(f.run('isPlaying || isPreparingPlayback'), false);
+    assert.equal(f.audibleSources().length, 0);
+    zone.listeners.touchend(touchEvent(0));
+    zone.listeners.touchstart(touchEvent(1));
+    await flush();
+    assert.equal(f.run('isPlaying'), true);
+});
+
+test('a touch compatibility click cannot toggle the same gesture again', async () => {
+    const f = fixture();
+    f.run('setupEventListeners()');
+    const zone = f.element('play-zone');
+    zone.listeners.touchstart(touchEvent(1));
+    await flush();
+    zone.listeners.touchend(touchEvent(0));
+    zone.listeners.click(clickEvent(1, true));
+    assert.equal(f.run('isPlaying'), true);
+    zone.listeners.click({ detail: 1, clientX: 105, clientY: 105 });
+    assert.equal(f.run('isPlaying'), true, 'older browsers without sourceCapabilities also suppress ghost clicks');
+});
+
+test('rapid alternating presses cannot turn repeated restarts into a fast click instrument', async t => {
+    const f = fixture();
+    f.run('setupEventListeners()');
+    const zone = f.element('play-zone');
+    for (let press = 0; press < 24; press++) {
+        zone.listeners.click(clickEvent());
+        await flush();
+        f.tick(80);
+    }
+    const starts = f.audibleSources();
+    t.diagnostic(`24 presses in 1.92 seconds scheduled ${starts.length} fresh downbeats`);
+    assert.ok(starts.length <= 4, `rapid presses scheduled ${starts.length} fresh downbeats in 1.92 seconds`);
+    for (let index = 1; index < starts.length; index++) {
+        assert.ok(starts[index].time - starts[index - 1].time >= 0.6 - 1e-8);
+    }
+});
+
+test('Stop and preparation cancellation stay immediate during the restart guard', async () => {
+    const f = fixture();
+    f.run('setupEventListeners()');
+    const zone = f.element('play-zone');
+    zone.listeners.click(clickEvent());
+    await flush();
+    zone.listeners.click(clickEvent());
+    assert.equal(f.run('isPlaying || isPreparingPlayback'), false);
+    assert.ok(f.audibleSources().every(sound => sound.stopped));
+    zone.listeners.click(clickEvent());
+    await flush();
+    assert.equal(f.run('isPlaying'), false, 'extra Start is ignored, not Stop');
+    f.tick(600);
+    zone.listeners.click(clickEvent());
+    await flush();
+    assert.equal(f.run('isPlaying'), true, 'a deliberate restart after the short guard works');
+
+    const pending = deferred();
+    const preparing = fixture({ render: () => pending.promise });
+    preparing.run('setupEventListeners()');
+    preparing.element('play-zone').listeners.click(clickEvent());
+    assert.equal(preparing.run('isPreparingPlayback'), true);
+    preparing.element('play-zone').listeners.click(clickEvent());
+    assert.equal(preparing.run('isPreparingPlayback'), false);
+});
+
+test('keyboard activation remains available while touch compatibility clicks are suppressed', async () => {
+    const f = fixture();
+    f.run('setupEventListeners()');
+    const zone = f.element('play-zone');
+    zone.listeners.touchstart(touchEvent(1));
+    await flush();
+    zone.listeners.touchend(touchEvent(0));
+    zone.listeners.click(clickEvent(0));
+    assert.equal(f.run('isPlaying'), false);
+});
+
+test('a genuine mouse Stop remains immediate after a touch activation', async () => {
+    const f = fixture();
+    f.run('setupEventListeners()');
+    const zone = f.element('play-zone');
+    zone.listeners.touchstart(touchEvent(1));
+    await flush();
+    zone.listeners.touchend(touchEvent(0));
+    zone.listeners.click(clickEvent(1, false));
+    assert.equal(f.run('isPlaying'), false);
+});
+
+test('ordinary Stop and immediate restart after normal practice are responsive', async () => {
+    const f = fixture();
+    f.run('setupEventListeners()');
+    const zone = f.element('play-zone');
+    zone.listeners.click(clickEvent());
+    await flush();
+    f.tick(5000);
+    zone.listeners.click(clickEvent());
+    assert.equal(f.run('isPlaying'), false);
+    zone.listeners.click(clickEvent());
+    await flush();
+    assert.equal(f.run('isPlaying'), true);
+});
+
+test('slow preparation still protects the first sound from an immediate rapid restart', async () => {
+    const pending = deferred();
+    const f = fixture({ render: () => pending.promise });
+    f.run('setupEventListeners()');
+    const zone = f.element('play-zone');
+    zone.listeners.click(clickEvent());
+    f.tick(1000);
+    pending.resolve({ duration: 0.1, kind: 'click' });
+    await flush();
+    assert.equal(f.run('isPlaying'), true);
+    f.tick(80);
+    zone.listeners.click(clickEvent());
+    zone.listeners.click(clickEvent());
+    await flush();
+    assert.equal(f.run('isPlaying'), false);
+    f.tick(520);
+    zone.listeners.click(clickEvent());
+    await flush();
+    assert.equal(f.run('isPlaying'), true);
+});
+
+test('a cancelled multi-touch gesture does not leave the play area locked', async () => {
+    const f = fixture();
+    f.run('setupEventListeners()');
+    const zone = f.element('play-zone');
+    zone.listeners.touchstart(touchEvent(3));
+    assert.equal(typeof zone.listeners.touchcancel, 'function');
+    zone.listeners.touchcancel(touchEvent(0));
+    zone.listeners.touchstart(touchEvent(1));
+    await flush();
+    assert.equal(f.run('isPlaying'), true);
+});
+
+test('a final finger released outside the play area rearms one-finger Stop', async () => {
+    const f = fixture();
+    f.run('setupEventListeners()');
+    const zone = f.element('play-zone');
+    zone.listeners.touchstart(touchEvent(1));
+    await flush();
+    zone.listeners.touchend(touchEvent(1)); // A second finger remains elsewhere.
+    assert.equal(f.run('playZoneTouchActive'), true);
+    let prevented = false;
+    const outsideRelease = touchEvent(0);
+    outsideRelease.preventDefault = () => { prevented = true; };
+    f.documentTouch('touchend', outsideRelease);
+    assert.equal(prevented, false, 'outside controls retain their normal defaults');
+    zone.listeners.touchstart(touchEvent(1));
+    assert.equal(f.run('isPlaying'), false);
+});
+
+test('outside release can finish gesture audio unlock and outside cancellation clears the latch', async () => {
+    const f = fixture({ resume: audio => {
+        if (audio.resumeCalls > 1) audio.setState('running');
+        return Promise.resolve();
+    } });
+    f.run('setupEventListeners()');
+    const zone = f.element('play-zone');
+    zone.listeners.touchstart(touchEvent(1));
+    zone.listeners.touchend(touchEvent(1));
+    f.documentTouch('touchend', touchEvent(0));
+    await flush();
+    assert.equal(f.run('isPlaying'), true);
+    assert.equal(f.contexts[0].resumeCalls, 2);
+    zone.listeners.touchstart(touchEvent(1));
+    f.documentTouch('touchcancel', touchEvent(0));
+    assert.equal(f.run('playZoneTouchActive'), false);
+});
+
+test('backgrounding clears an ignored gesture so the play area is not locked on return', async () => {
+    const f = fixture();
+    f.run('setupEventListeners()');
+    const zone = f.element('play-zone');
+    zone.listeners.touchstart(touchEvent(3));
+    f.visibility('hidden');
+    f.visibility('visible');
+    zone.listeners.touchstart(touchEvent(1));
+    await flush();
+    assert.equal(f.run('isPlaying'), true);
+});
 
 test('start verifies running audio and ready click buffers before showing playback', async () => {
     const f = fixture();
@@ -180,12 +404,12 @@ test('touch release retries gesture unlock without toggling playback twice', asy
         return Promise.resolve();
     } });
     f.run('setupEventListeners()');
-    const starting = f.run('togglePlay()');
-    f.element('play-zone').listeners.touchend({ preventDefault() {} });
-    await starting;
+    f.element('play-zone').listeners.touchstart(touchEvent(1));
+    f.element('play-zone').listeners.touchend(touchEvent(0));
+    await flush();
     assert.equal(f.contexts[0].resumeCalls, 2);
     assert.equal(f.run('isPlaying'), true);
-    f.element('play-zone').listeners.touchend({ preventDefault() {} });
+    f.element('play-zone').listeners.touchend(touchEvent(0));
     assert.equal(f.run('isPlaying'), true);
 });
 

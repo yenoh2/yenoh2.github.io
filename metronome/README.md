@@ -93,6 +93,8 @@ Notes:
 
 ### Audio Recovery and Device Checks
 
+- The play area accepts one finger per gesture; extra fingers and touch-generated follow-up clicks do not toggle playback. All fingers must lift before another touch gesture is accepted.
+- Closely repeated Starts are ignored for 600 ms after starting, including the first sound after preparation. Stop and cancellation remain immediate. Normal playback tempo is unchanged.
 - Tap the play area again to cancel while sound is starting.
 - Playback starts only after the audio context is running and the click buffers are ready. A failed start shows a short retry message in the existing play area.
 - Stop clears queued sounds and beat flashes. Returning from another app or an audio interruption uses a fresh timing cycle, without replaying missed beats.
