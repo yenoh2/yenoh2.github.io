@@ -310,7 +310,7 @@ const game = {
 
   updateTitle() {
     if (pressed.has('ArrowUp') || pressed.has('KeyW') || pressed.has('ArrowDown') || pressed.has('KeyS')) { this.menu ^= 1; sfx.select(); }
-    if (pressed.has('Enter') || pressed.has('Space') || pressed.has('KeyF')) {
+    if (pressed.has('Enter') || pressed.has('NumpadEnter') || pressed.has('Space') || pressed.has('KeyF')) {
       this.mode = this.menu === 0 ? 'cpu' : 'pvp'; this.scene = 'select'; this.picked = [false, false];
       this.pick = [0, 1]; sfx.confirm();
     }
@@ -326,16 +326,18 @@ const game = {
     };
     if (this.mode === 'pvp') {
       step(0, 'KeyA', 'KeyD', ['KeyF']);
-      step(1, 'ArrowLeft', 'ArrowRight', ['Comma', 'Enter']);
+      step(1, 'ArrowLeft', 'ArrowRight', ['Comma']);
+      // Enter locks in whoever hasn't confirmed yet and starts the match
+      if (pressed.has('Enter') || pressed.has('NumpadEnter')) { this.picked = [true, true]; sfx.confirm(); }
     } else if (!this.picked[0]) {
-      step(0, 'KeyA', 'KeyD', ['KeyF', 'Enter', 'Space']);
+      step(0, 'KeyA', 'KeyD', ['KeyF', 'Enter', 'NumpadEnter', 'Space']);
       if (!this.picked[0]) step(0, 'ArrowLeft', 'ArrowRight', []);
       if (this.picked[0]) { this.pick[1] = (this.pick[0] + 1) % n; this.picked[1] = true; }
     }
     if (pressed.has('Escape')) { this.scene = 'title'; return; }
     if (this.picked[0] && this.picked[1]) {
       this.selectDone = (this.selectDone || 0) + 1;
-      if (this.selectDone > 40) { this.selectDone = 0; this.startMatch(); }
+      if (this.selectDone > 20) { this.selectDone = 0; this.startMatch(); }
     }
   },
 
@@ -391,7 +393,7 @@ const game = {
         else { this.round++; this.startRound(); }
       }
     } else if (this.phase === 'over') {
-      if (this.phaseT > 1 && (pressed.has('Enter') || pressed.has('Space') || pressed.has('KeyF'))) this.scene = 'title';
+      if (this.phaseT > 1 && (pressed.has('Enter') || pressed.has('NumpadEnter') || pressed.has('Space') || pressed.has('KeyF'))) this.scene = 'title';
     }
   },
 
@@ -469,7 +471,7 @@ const game = {
         this.text(p === 0 ? 'P1' : (this.mode === 'cpu' ? 'CPU' : 'P2'), x + (p === 0 ? 24 : size - 24), y - 26, 12, col);
       });
     });
-    const hint = this.mode === 'pvp' ? 'P1: A/D + F     P2: ARROWS + ,' : 'A/D OR ARROWS TO CHOOSE, F OR ENTER TO CONFIRM';
+    const hint = this.mode === 'pvp' ? 'P1: A/D + F    P2: ARROWS + ,    ENTER: START' : 'A/D OR ARROWS TO CHOOSE, F OR ENTER TO CONFIRM';
     this.text(hint, W / 2, 470, 10, '#b9c0e8');
     this.text('ESC: BACK', W / 2, 500, 8, '#8088b0');
   },
