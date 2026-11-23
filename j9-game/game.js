@@ -177,6 +177,7 @@ class Fighter {
   }
 
   takeHit(a, from) {
+    if (from.cpu) a = { ...a, dmg: a.dmg * LEVELS[level].dmg, isKick: a === ATTACKS.kick };
     const blocking = this.state === 'block' && this.face === -from.face;
     if (blocking) {
       this.hp = Math.max(1, this.hp - a.dmg * .12);
@@ -189,7 +190,7 @@ class Fighter {
     from.meter = Math.min(100, from.meter + a.meter);
     this.flash = .12; this.attack = null;
     const heavy = a.knockdown || this.hp <= 0 || !this.grounded;
-    game.spark((this.x + from.x) / 2 + from.face * 30, this.y - (a === ATTACKS.kick ? 170 : 200), heavy ? '#ffd24a' : '#fff', heavy ? 16 : 8);
+    game.spark((this.x + from.x) / 2 + from.face * 30, this.y - (a === ATTACKS.kick || a.isKick ? 170 : 200), heavy ? '#ffd24a' : '#fff', heavy ? 16 : 8);
     game.hitstop = heavy ? .12 : .05; game.shake = heavy ? .3 : .12;
     if (heavy) {
       this.vx = from.face * 380; this.vy = -620; this.y -= 1; this.set('fall'); sfx.heavy();
@@ -255,20 +256,31 @@ function star(x, y, r) {
 }
 
 // ---------------------------------------------------------------- CPU
+// think: seconds between decisions [min, extra]; attack: how often it swings when in range;
+// block: chance to react to your attack; dmg: how hard its hits land.
+const LEVELS = [
+  { name: 'EASY',   think: [.50, .45], attack: .40, block: .08, dmg: .7 },
+  { name: 'NORMAL', think: [.35, .38], attack: .58, block: .18, dmg: .82 },
+  { name: 'HARD',   think: [.12, .22], attack: 1,   block: .45, dmg: 1 },
+];
+let level = 1;
+try { const v = +localStorage.getItem('j9-level'); if (v >= 0 && v < LEVELS.length && localStorage.getItem('j9-level') !== null) level = v; } catch (e) {}
 function readCpu(me, foe, dt) {
   const ai = me.ai, inp = { left: false, right: false, up: false, block: false, punch: false, kick: false, special: false };
   const dist = Math.abs(foe.x - me.x), toward = foe.x > me.x ? 'right' : 'left', away = toward === 'right' ? 'left' : 'right';
   ai.timer -= dt; ai.wantBlock -= dt;
+  const L = LEVELS[level];
   const foeSwinging = ['punch', 'kick', 'special'].includes(foe.state);
-  if (foeSwinging && foe.t < .06 && dist < 190 && Math.random() < .45) ai.wantBlock = .35;
+  if (foeSwinging && foe.t < .06 && dist < 190 && Math.random() < L.block) ai.wantBlock = .35;
   if (ai.wantBlock > 0) { inp.block = true; return inp; }
   if (ai.timer <= 0) {
-    ai.timer = .12 + Math.random() * .22;
-    const r = Math.random();
+    ai.timer = L.think[0] + Math.random() * L.think[1];
+    const r = Math.random(), swing = Math.random() < L.attack;
     if (dist > 150) ai.move = r < .8 ? 1 : (r < .9 ? 0 : -1);
     else if (dist < 80) ai.move = r < .5 ? -1 : 0;
     else ai.move = r < .25 ? -1 : (r < .5 ? 1 : 0);
-    if (me.meter >= 100 && dist < 260 && dist > 90 && r < .6) inp.special = true;
+    if (!swing) { /* hesitates this beat */ }
+    else if (me.meter >= 100 && dist < 260 && dist > 90 && r < .6) inp.special = true;
     else if (dist < 118 && r < .5) inp.punch = true;
     else if (dist < 146 && r < .75) inp.kick = true;
     else if (dist > 220 && r > .96) inp.up = true;
@@ -309,7 +321,15 @@ const game = {
   },
 
   updateTitle() {
-    if (pressed.has('ArrowUp') || pressed.has('KeyW') || pressed.has('ArrowDown') || pressed.has('KeyS')) { this.menu ^= 1; sfx.select(); }
+    const up = pressed.has('ArrowUp') || pressed.has('KeyW'), down = pressed.has('ArrowDown') || pressed.has('KeyS');
+    if (up || down) { this.menu = (this.menu + (down ? 1 : 2)) % 3; sfx.select(); }
+    const dl = (pressed.has('ArrowRight') || pressed.has('KeyD') ? 1 : 0) - (pressed.has('ArrowLeft') || pressed.has('KeyA') ? 1 : 0);
+    const enter = pressed.has('Enter') || pressed.has('NumpadEnter') || pressed.has('Space') || pressed.has('KeyF');
+    if (this.menu === 2 && (dl || enter)) {
+      level = (level + (dl || 1) + LEVELS.length) % LEVELS.length; sfx.select();
+      try { localStorage.setItem('j9-level', level); } catch (e) {}
+      return;
+    }
     if (pressed.has('Enter') || pressed.has('NumpadEnter') || pressed.has('Space') || pressed.has('KeyF')) {
       this.mode = this.menu === 0 ? 'cpu' : 'pvp'; this.scene = 'select'; this.picked = [false, false];
       this.pick = [0, 1]; sfx.confirm();
@@ -444,12 +464,12 @@ const game = {
     this.portrait(0, 120, 190, 150, false); this.portrait(1, W - 270, 190, 150, true);
     this.text('J9', W / 2, 110, 84, '#ffd24a', 'center', '#7a1010');
     this.text('AFTER HOURS', W / 2, 180, 30, '#fff');
-    const items = ['1 PLAYER  VS  CPU', '2 PLAYERS'];
+    const items = ['1 PLAYER  VS  CPU', '2 PLAYERS', 'CPU LEVEL: ' + LEVELS[level].name];
     items.forEach((s, i) => {
       const on = this.menu === i;
-      this.text((on ? '> ' : '  ') + s + (on ? ' <' : '  '), W / 2, 270 + i * 44, 16, on ? '#ffd24a' : '#9aa0c0');
+      this.text((on ? '> ' : '  ') + s + (on ? ' <' : '  '), W / 2, 262 + i * 38, 16, on ? '#ffd24a' : '#9aa0c0');
     });
-    if (Math.floor(this.time * 2) % 2) this.text('PRESS ENTER', W / 2, 380, 14, '#fff');
+    if (Math.floor(this.time * 2) % 2) this.text(this.menu === 2 ? 'LEFT / RIGHT TO CHANGE' : 'PRESS ENTER', W / 2, 394, 14, '#fff');
     this.text('P1  A/D MOVE  W JUMP  S BLOCK  F PUNCH  G KICK  H SPECIAL', W / 2, 452, 9, '#b9c0e8');
     this.text('P2  ARROWS MOVE/JUMP/BLOCK  , PUNCH  . KICK  / SPECIAL', W / 2, 474, 9, '#b9c0e8');
     this.text('FILL THE METER BY LANDING HITS, THEN UNLEASH YOUR SPECIAL', W / 2, 504, 8, '#8088b0');
@@ -496,7 +516,7 @@ const game = {
       ctx.fillStyle = f.hp > 30 ? '#f4c21f' : '#ff5a2a'; ctx.fillRect(i === 0 ? x + bw - cur : x, by, cur, bh);
       ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(i === 0 ? x + bw - cur : x, by, cur, 5);
       this.portrait(ROSTER.indexOf(f.char), i === 0 ? 18 : W - 18 - 62, 14, 62, i === 1);
-      this.text(f.char.name + (f.cpu ? ' (CPU)' : ''), i === 0 ? x : x + bw, by + bh + 16, 10, '#fff', i === 0 ? 'left' : 'right');
+      this.text(f.char.name + (f.cpu ? ' (CPU ' + LEVELS[level].name + ')' : ''), i === 0 ? x : x + bw, by + bh + 16, 10, '#fff', i === 0 ? 'left' : 'right');
       // special meter
       const mw = 180, mx = i === 0 ? x : x + bw - mw, my = H - 30, full = f.meter >= 100;
       ctx.fillStyle = '#000'; ctx.fillRect(mx - 3, my - 3, mw + 6, 14);
@@ -540,5 +560,5 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-window.__game = game; // handy for debugging in the console
+window.__game = game; window.__setLevel = n => { level = n; }; window.__levels = LEVELS; window.__step = () => { game.update(1 / 60); pressed.clear(); }; // handy for debugging in the console
 })();
